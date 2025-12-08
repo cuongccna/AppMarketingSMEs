@@ -5,9 +5,9 @@ import { useSession } from 'next-auth/react'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { AnalyticsDashboard } from '@/components/analytics/dashboard'
 import { ReviewCard } from '@/components/reviews/review-card'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   ArrowRight,
   Plus,
@@ -15,11 +15,14 @@ import {
   Sparkles,
   MapPin,
   Bell,
+  AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useDashboard } from '@/hooks/useDashboard'
+import { useReviews } from '@/hooks/useReviews'
 
-// Mock data for demonstration
-const mockDashboardData = {
+// Fallback mock data for when API is unavailable
+const fallbackDashboardData = {
   overview: {
     totalReviews: 147,
     averageRating: 4.3,
@@ -37,13 +40,13 @@ const mockDashboardData = {
     negative: 11,
   },
   trend: [
-    { date: '2025-11-24', newReviews: 5, positiveCount: 3, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-11-25', newReviews: 8, positiveCount: 6, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-11-26', newReviews: 3, positiveCount: 2, negativeCount: 0, neutralCount: 1 },
-    { date: '2025-11-27', newReviews: 6, positiveCount: 4, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-11-28', newReviews: 4, positiveCount: 3, negativeCount: 1, neutralCount: 0 },
-    { date: '2025-11-29', newReviews: 7, positiveCount: 5, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-11-30', newReviews: 9, positiveCount: 7, negativeCount: 1, neutralCount: 1 },
+    { date: '2025-12-02', newReviews: 5, positiveCount: 3, negativeCount: 1, neutralCount: 1 },
+    { date: '2025-12-03', newReviews: 8, positiveCount: 6, negativeCount: 1, neutralCount: 1 },
+    { date: '2025-12-04', newReviews: 3, positiveCount: 2, negativeCount: 0, neutralCount: 1 },
+    { date: '2025-12-05', newReviews: 6, positiveCount: 4, negativeCount: 1, neutralCount: 1 },
+    { date: '2025-12-06', newReviews: 4, positiveCount: 3, negativeCount: 1, neutralCount: 0 },
+    { date: '2025-12-07', newReviews: 7, positiveCount: 5, negativeCount: 1, neutralCount: 1 },
+    { date: '2025-12-08', newReviews: 9, positiveCount: 7, negativeCount: 1, neutralCount: 1 },
   ],
   topKeywords: [
     { keyword: 'ngon', count: 45 },
@@ -56,7 +59,8 @@ const mockDashboardData = {
   ],
 }
 
-const mockRecentReviews = [
+// Fallback reviews for when API fails
+const fallbackReviews = [
   {
     id: '1',
     authorName: 'Nguyễn Văn An',
@@ -66,7 +70,9 @@ const mockRecentReviews = [
     status: 'NEW',
     publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     keywords: ['ngon', 'phục vụ', 'sạch sẽ'],
-    location: { name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
+    platform: 'GOOGLE_BUSINESS_PROFILE',
+    externalId: 'ext-1',
+    location: { id: 'loc-1', name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
     responses: [],
   },
   {
@@ -78,13 +84,16 @@ const mockRecentReviews = [
     status: 'AI_DRAFT_READY',
     publishedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     keywords: ['đợi lâu', 'bận rộn'],
-    location: { name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
+    platform: 'GOOGLE_BUSINESS_PROFILE',
+    externalId: 'ext-2',
+    location: { id: 'loc-2', name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
     responses: [
       {
         id: 'r1',
-        content: 'Cảm ơn bạn Bình đã ghé thăm và chia sẻ trải nghiệm! Chúng tôi rất tiếc vì bạn phải chờ đợi lâu. Trong giờ cao điểm, đôi khi quán đông khách hơn dự kiến. Chúng tôi đang cải thiện quy trình phục vụ để rút ngắn thời gian chờ. Rất mong được đón tiếp bạn lần sau với trải nghiệm tốt hơn!',
+        content: 'Cảm ơn bạn Bình đã ghé thăm và chia sẻ trải nghiệm! Chúng tôi rất tiếc vì bạn phải chờ đợi lâu.',
         status: 'PENDING_APPROVAL',
         isAiGenerated: true,
+        createdAt: new Date().toISOString(),
       },
     ],
   },
@@ -97,40 +106,69 @@ const mockRecentReviews = [
     status: 'NEW',
     publishedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
     keywords: ['thất vọng', 'nguội', 'chậm'],
-    location: { name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
+    platform: 'GOOGLE_BUSINESS_PROFILE',
+    externalId: 'ext-3',
+    location: { id: 'loc-1', name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
     responses: [],
   },
 ]
 
 export default function DashboardPage() {
   const { data: session } = useSession()
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [generatingReviewId, setGeneratingReviewId] = React.useState<string | null>(null)
+  
+  // Fetch dashboard data from API
+  const { 
+    data: dashboardData, 
+    isLoading: isDashboardLoading, 
+    error: dashboardError,
+    refetch: refetchDashboard 
+  } = useDashboard({ dateRange: '7d' })
+  
+  // Fetch recent reviews from API
+  const {
+    reviews: apiReviews,
+    isLoading: isReviewsLoading,
+    error: reviewsError,
+    generateResponse,
+    approveResponse,
+    syncReviews,
+    isGenerating,
+    isSyncing,
+  } = useReviews({ limit: 6 })
 
-  const handleGenerateResponse = async (reviewId: string) => {
-    setGeneratingReviewId(reviewId)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setGeneratingReviewId(null)
-    // In real app, this would call the API and refresh data
-  }
-
-  const handleApproveResponse = async (responseId: string, content?: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    // In real app, this would call the API and refresh data
-  }
+  // Use API data or fallback
+  const displayData = dashboardData || fallbackDashboardData
+  const recentReviews = apiReviews.length > 0 ? apiReviews : fallbackReviews
+  const hasError = dashboardError || reviewsError
 
   const handleSync = async () => {
-    setIsLoading(true)
-    // Simulate sync
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsLoading(false)
+    await syncReviews()
+    await refetchDashboard()
   }
+
+  // Calculate quick stats from data
+  const negativeCount = displayData.sentiment?.negative || 0
+  const pendingAI = recentReviews.filter(r => r.status === 'AI_DRAFT_READY').length
+  const locationsCount = 2 // This would come from useBusinesses in real implementation
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Error Banner */}
+        {hasError && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-yellow-800">
+                Không thể tải dữ liệu từ server
+              </p>
+              <p className="text-sm text-yellow-700 mt-1">
+                Đang hiển thị dữ liệu mẫu. Vui lòng kiểm tra kết nối database.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -142,9 +180,9 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handleSync} disabled={isLoading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Đồng bộ
+            <Button variant="outline" onClick={handleSync} disabled={isSyncing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ'}
             </Button>
             <Link href="/dashboard/businesses">
               <Button>
@@ -162,7 +200,13 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-orange-800">Cần xử lý ngay</p>
-                  <p className="text-2xl font-bold text-orange-600">3 đánh giá tiêu cực</p>
+                  {isDashboardLoading ? (
+                    <Skeleton className="h-8 w-32 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-orange-600">
+                      {negativeCount} đánh giá tiêu cực
+                    </p>
+                  )}
                 </div>
                 <Bell className="h-8 w-8 text-orange-500" />
               </div>
@@ -180,7 +224,11 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-blue-800">Phản hồi AI chờ duyệt</p>
-                  <p className="text-2xl font-bold text-blue-600">5 phản hồi</p>
+                  {isReviewsLoading ? (
+                    <Skeleton className="h-8 w-24 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-blue-600">{pendingAI} phản hồi</p>
+                  )}
                 </div>
                 <Sparkles className="h-8 w-8 text-blue-500" />
               </div>
@@ -198,7 +246,7 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-green-800">Địa điểm đang theo dõi</p>
-                  <p className="text-2xl font-bold text-green-600">2 địa điểm</p>
+                  <p className="text-2xl font-bold text-green-600">{locationsCount} địa điểm</p>
                 </div>
                 <MapPin className="h-8 w-8 text-green-500" />
               </div>
@@ -213,7 +261,14 @@ export default function DashboardPage() {
         </div>
 
         {/* Analytics Dashboard */}
-        <AnalyticsDashboard data={mockDashboardData} />
+        {isDashboardLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : (
+          <AnalyticsDashboard data={displayData} />
+        )}
 
         {/* Recent Reviews */}
         <div>
@@ -232,17 +287,40 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {mockRecentReviews.map((review) => (
-              <ReviewCard
-                key={review.id}
-                review={review}
-                onGenerateResponse={handleGenerateResponse}
-                onApproveResponse={handleApproveResponse}
-                isGenerating={generatingReviewId === review.id}
-              />
-            ))}
-          </div>
+          {isReviewsLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-48 w-full" />
+              ))}
+            </div>
+          ) : recentReviews.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {recentReviews.slice(0, 6).map((review) => (
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  onGenerateResponse={(id) => generateResponse(id, 'PROFESSIONAL')}
+                  onApproveResponse={(id, content) => approveResponse(id, content)}
+                  isGenerating={isGenerating === review.id}
+                />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  Chưa có đánh giá nào. Hãy kết nối Google Business Profile để bắt đầu!
+                </p>
+                <Link href="/dashboard/businesses">
+                  <Button className="mt-4">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Kết nối ngay
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </DashboardLayout>

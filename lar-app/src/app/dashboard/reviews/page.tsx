@@ -6,6 +6,7 @@ import { ReviewCard } from '@/components/reviews/review-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -21,10 +22,13 @@ import {
   ThumbsDown,
   Minus,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react'
+import { useReviews } from '@/hooks/useReviews'
+import { useSearchParams } from 'next/navigation'
 
-// Extended mock data
-const mockReviews = [
+// Fallback reviews for development/error states
+const fallbackReviews = [
   {
     id: '1',
     authorName: 'Nguyễn Văn An',
@@ -34,7 +38,9 @@ const mockReviews = [
     status: 'NEW',
     publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     keywords: ['ngon', 'phục vụ', 'sạch sẽ'],
-    location: { name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
+    platform: 'GOOGLE_BUSINESS_PROFILE',
+    externalId: 'ext-1',
+    location: { id: 'loc-1', name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
     responses: [],
   },
   {
@@ -46,13 +52,16 @@ const mockReviews = [
     status: 'AI_DRAFT_READY',
     publishedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     keywords: ['đợi lâu', 'bận rộn'],
-    location: { name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
+    platform: 'GOOGLE_BUSINESS_PROFILE',
+    externalId: 'ext-2',
+    location: { id: 'loc-2', name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
     responses: [
       {
         id: 'r1',
-        content: 'Cảm ơn bạn Bình đã ghé thăm và chia sẻ trải nghiệm! Chúng tôi rất tiếc vì bạn phải chờ đợi lâu. Trong giờ cao điểm, đôi khi quán đông khách hơn dự kiến. Chúng tôi đang cải thiện quy trình phục vụ để rút ngắn thời gian chờ. Rất mong được đón tiếp bạn lần sau với trải nghiệm tốt hơn!',
+        content: 'Cảm ơn bạn Bình đã ghé thăm và chia sẻ trải nghiệm! Chúng tôi rất tiếc vì bạn phải chờ đợi lâu.',
         status: 'PENDING_APPROVAL',
         isAiGenerated: true,
+        createdAt: new Date().toISOString(),
       },
     ],
   },
@@ -65,7 +74,9 @@ const mockReviews = [
     status: 'NEW',
     publishedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
     keywords: ['thất vọng', 'nguội', 'chậm'],
-    location: { name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
+    platform: 'GOOGLE_BUSINESS_PROFILE',
+    externalId: 'ext-3',
+    location: { id: 'loc-1', name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
     responses: [],
   },
   {
@@ -76,88 +87,63 @@ const mockReviews = [
     sentiment: 'POSITIVE' as const,
     status: 'RESPONDED',
     publishedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    keywords: ['tuyệt vời', 'ngon', 'thân thiện', 'hợp lý'],
-    location: { name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
+    keywords: ['tuyệt vời', 'ngon', 'thân thiện'],
+    platform: 'GOOGLE_BUSINESS_PROFILE',
+    externalId: 'ext-4',
+    location: { id: 'loc-2', name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
     responses: [
       {
         id: 'r2',
-        content: 'Cảm ơn bạn Dũng đã dành 5 sao cho chúng tôi! Thật vui khi bạn hài lòng với đồ ăn và dịch vụ. Rất mong được phục vụ bạn trong lần tới!',
+        content: 'Cảm ơn bạn Dũng đã dành 5 sao cho chúng tôi!',
         status: 'PUBLISHED',
         isAiGenerated: true,
-      },
-    ],
-  },
-  {
-    id: '5',
-    authorName: 'Hoàng Thị Em',
-    rating: 4,
-    content: 'Đồ ăn ngon, không gian đẹp. Chỉ hơi ồn vào cuối tuần.',
-    sentiment: 'POSITIVE' as const,
-    status: 'NEW',
-    publishedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-    keywords: ['ngon', 'đẹp', 'ồn'],
-    location: { name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
-    responses: [],
-  },
-  {
-    id: '6',
-    authorName: 'Võ Văn Phúc',
-    rating: 2,
-    content: 'Order online nhưng giao trễ 45 phút. Đồ ăn đã nguội khi nhận.',
-    sentiment: 'NEGATIVE' as const,
-    status: 'AI_DRAFT_READY',
-    publishedAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-    keywords: ['giao trễ', 'nguội'],
-    location: { name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
-    responses: [
-      {
-        id: 'r3',
-        content: 'Xin chào bạn Phúc, chúng tôi thành thật xin lỗi về trải nghiệm giao hàng không tốt lần này. Việc giao trễ 45 phút là không thể chấp nhận được và chúng tôi đang làm việc với đối tác giao hàng để cải thiện. Mong bạn cho chúng tôi cơ hội phục vụ tốt hơn lần sau!',
-        status: 'PENDING_APPROVAL',
-        isAiGenerated: true,
+        createdAt: new Date().toISOString(),
       },
     ],
   },
 ]
 
-export default function ReviewsPage() {
-  const [reviews, setReviews] = React.useState(mockReviews)
-  const [searchQuery, setSearchQuery] = React.useState('')
-  const [sentimentFilter, setSentimentFilter] = React.useState<string>('all')
-  const [statusFilter, setStatusFilter] = React.useState<string>('all')
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [generatingReviewId, setGeneratingReviewId] = React.useState<string | null>(null)
+function ReviewsPageContent() {
+  const searchParams = useSearchParams()
+  const initialSentiment = searchParams.get('sentiment') || 'all'
+  const initialStatus = searchParams.get('status') || 'all'
 
-  // Filter reviews
+  const [searchQuery, setSearchQuery] = React.useState('')
+  const [sentimentFilter, setSentimentFilter] = React.useState<string>(initialSentiment)
+  const [statusFilter, setStatusFilter] = React.useState<string>(initialStatus)
+
+  // Fetch reviews from API with filters
+  const {
+    reviews: apiReviews,
+    isLoading,
+    error,
+    generateResponse,
+    approveResponse,
+    syncReviews,
+    isGenerating,
+    isSyncing,
+    refetch,
+  } = useReviews({
+    sentiment: sentimentFilter,
+    status: statusFilter,
+    search: searchQuery,
+  })
+
+  // Use API reviews or fallback
+  const reviews = apiReviews.length > 0 ? apiReviews : (error ? fallbackReviews : apiReviews)
+
+  // Filter client-side for search (in case API doesn't support full-text search)
   const filteredReviews = reviews.filter((review) => {
+    if (!searchQuery) return true
     const matchesSearch = 
       review.authorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       review.content?.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesSentiment = sentimentFilter === 'all' || review.sentiment === sentimentFilter
-    const matchesStatus = statusFilter === 'all' || review.status === statusFilter
-    
-    return matchesSearch && matchesSentiment && matchesStatus
+    return matchesSearch
   })
 
-  const handleGenerateResponse = async (reviewId: string) => {
-    setGeneratingReviewId(reviewId)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setGeneratingReviewId(null)
-    // In real app, this would call the API and refresh data
-  }
-
-  const handleApproveResponse = async (responseId: string, content?: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    // In real app, this would call the API and refresh data
-  }
-
   const handleSync = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsLoading(false)
+    await syncReviews()
+    await refetch()
   }
 
   const stats = {
@@ -171,6 +157,21 @@ export default function ReviewsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-yellow-800">
+                Không thể tải dữ liệu từ server
+              </p>
+              <p className="text-sm text-yellow-700 mt-1">
+                Đang hiển thị dữ liệu mẫu. {error}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -179,32 +180,44 @@ export default function ReviewsPage() {
               Xem và phản hồi tất cả đánh giá từ khách hàng
             </p>
           </div>
-          <Button onClick={handleSync} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Đồng bộ từ GBP
+          <Button onClick={handleSync} disabled={isSyncing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ từ GBP'}
           </Button>
         </div>
 
         {/* Quick Stats */}
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="px-3 py-1">
-            Tổng: {stats.total}
-          </Badge>
-          <Badge variant="warning" className="px-3 py-1">
-            Mới: {stats.new}
-          </Badge>
-          <Badge variant="secondary" className="px-3 py-1">
-            <Sparkles className="h-3 w-3 mr-1" />
-            Chờ duyệt: {stats.pending}
-          </Badge>
-          <Badge variant="success" className="px-3 py-1">
-            <ThumbsUp className="h-3 w-3 mr-1" />
-            Tích cực: {stats.positive}
-          </Badge>
-          <Badge variant="danger" className="px-3 py-1">
-            <ThumbsDown className="h-3 w-3 mr-1" />
-            Tiêu cực: {stats.negative}
-          </Badge>
+          {isLoading ? (
+            <>
+              <Skeleton className="h-7 w-20" />
+              <Skeleton className="h-7 w-16" />
+              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-7 w-20" />
+              <Skeleton className="h-7 w-20" />
+            </>
+          ) : (
+            <>
+              <Badge variant="outline" className="px-3 py-1">
+                Tổng: {stats.total}
+              </Badge>
+              <Badge variant="warning" className="px-3 py-1">
+                Mới: {stats.new}
+              </Badge>
+              <Badge variant="secondary" className="px-3 py-1">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Chờ duyệt: {stats.pending}
+              </Badge>
+              <Badge variant="success" className="px-3 py-1">
+                <ThumbsUp className="h-3 w-3 mr-1" />
+                Tích cực: {stats.positive}
+              </Badge>
+              <Badge variant="danger" className="px-3 py-1">
+                <ThumbsDown className="h-3 w-3 mr-1" />
+                Tiêu cực: {stats.negative}
+              </Badge>
+            </>
+          )}
         </div>
 
         {/* Filters */}
@@ -261,15 +274,21 @@ export default function ReviewsPage() {
         </div>
 
         {/* Reviews Grid */}
-        {filteredReviews.length > 0 ? (
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-48 w-full" />
+            ))}
+          </div>
+        ) : filteredReviews.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredReviews.map((review) => (
               <ReviewCard
                 key={review.id}
                 review={review}
-                onGenerateResponse={handleGenerateResponse}
-                onApproveResponse={handleApproveResponse}
-                isGenerating={generatingReviewId === review.id}
+                onGenerateResponse={(id) => generateResponse(id, 'PROFESSIONAL')}
+                onApproveResponse={(id, content) => approveResponse(id, content)}
+                isGenerating={isGenerating === review.id}
               />
             ))}
           </div>
@@ -286,5 +305,29 @@ export default function ReviewsPage() {
         )}
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function ReviewsPage() {
+  return (
+    <React.Suspense fallback={
+      <DashboardLayout>
+        <div className="space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <div className="flex gap-2">
+            <Skeleton className="h-7 w-20" />
+            <Skeleton className="h-7 w-16" />
+            <Skeleton className="h-7 w-24" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-48 w-full" />
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    }>
+      <ReviewsPageContent />
+    </React.Suspense>
   )
 }
