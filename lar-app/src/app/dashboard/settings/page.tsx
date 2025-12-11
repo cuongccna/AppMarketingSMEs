@@ -1,13 +1,13 @@
 'use client'
 
-import React from 'react'
-import { useSession } from 'next-auth/react'
+import React, { useEffect } from 'react'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -18,7 +18,6 @@ import {
 import {
   User,
   Mail,
-  Building2,
   Bell,
   MessageSquare,
   Sparkles,
@@ -32,9 +31,11 @@ import {
   Shield,
   Globe,
   Palette,
+  AlertCircle,
 } from 'lucide-react'
+import { useProfile, useNotifications, useAIConfig, useTemplates } from '@/hooks'
 
-// Tabs Component (inline)
+// Tabs Component
 function Tabs({ 
   tabs, 
   activeTab, 
@@ -64,47 +65,17 @@ function Tabs({
   )
 }
 
-// Mock data
-const mockProfile = {
-  name: 'Nguyễn Văn A',
-  email: 'nguyenvana@example.com',
-  company: 'Công ty TNHH ABC',
-  phone: '0912 345 678',
+// Toast notification helper
+function Toast({ message, type = 'success' }: { message: string; type?: 'success' | 'error' }) {
+  return (
+    <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
+      type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+    }`}>
+      {type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+      {message}
+    </div>
+  )
 }
-
-const mockNotificationSettings = {
-  emailNewReview: true,
-  emailNegativeReview: true,
-  emailWeeklyReport: true,
-  zaloNewReview: false,
-  zaloNegativeReview: true,
-  pushEnabled: false,
-}
-
-const mockToneSettings = {
-  defaultTone: 'FRIENDLY',
-  customInstructions: '',
-  includeBusinessName: true,
-  includeManagerSignature: false,
-  managerName: '',
-}
-
-const mockTemplates = [
-  {
-    id: '1',
-    name: 'Cảm ơn đánh giá 5 sao',
-    tone: 'FRIENDLY',
-    content: 'Cảm ơn {customerName} đã dành 5 sao cho {businessName}! Chúng tôi rất vui khi bạn hài lòng với dịch vụ. Rất mong được phục vụ bạn trong lần tới!',
-    useCount: 45,
-  },
-  {
-    id: '2',
-    name: 'Xin lỗi đánh giá tiêu cực',
-    tone: 'EMPATHETIC',
-    content: 'Chúng tôi thành thật xin lỗi về trải nghiệm không tốt của bạn. Vui lòng liên hệ hotline {phone} để chúng tôi có thể hỗ trợ và khắc phục. Cảm ơn bạn đã phản hồi.',
-    useCount: 12,
-  },
-]
 
 const toneOptions = [
   { value: 'FRIENDLY', label: 'Thân thiện', description: 'Gần gũi, tự nhiên' },
@@ -114,19 +85,104 @@ const toneOptions = [
   { value: 'FORMAL', label: 'Trang trọng', description: 'Nghiêm túc, chuẩn mực' },
 ]
 
-// Profile Tab
-function ProfileTab() {
-  const [profile, setProfile] = React.useState(mockProfile)
-  const [isLoading, setIsLoading] = React.useState(false)
+const modelOptions = [
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Nhanh, tiết kiệm chi phí' },
+  { value: 'gpt-4o', label: 'GPT-4o', description: 'Mạnh mẽ nhất' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Google AI, nhanh' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', description: 'Google AI, mạnh' },
+]
 
-  const handleSave = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsLoading(false)
+// Profile Tab with real API
+function ProfileTab() {
+  const { profile, isLoading, error, fetchProfile, updateProfile, changePassword } = useProfile()
+  const [localProfile, setLocalProfile] = React.useState({
+    name: '',
+    phone: '',
+    company: '',
+  })
+  const [passwords, setPasswords] = React.useState({
+    current: '',
+    new: '',
+    confirm: '',
+  })
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  useEffect(() => {
+    fetchProfile()
+  }, [fetchProfile])
+
+  useEffect(() => {
+    if (profile) {
+      setLocalProfile({
+        name: profile.name || '',
+        phone: profile.phone || '',
+        company: profile.company || '',
+      })
+    }
+  }, [profile])
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true)
+    const success = await updateProfile(localProfile)
+    setIsSaving(false)
+    if (success) {
+      showToast('Đã lưu thông tin thành công!')
+    } else {
+      showToast(error || 'Có lỗi xảy ra', 'error')
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      showToast('Mật khẩu mới không khớp', 'error')
+      return
+    }
+    if (passwords.new.length < 6) {
+      showToast('Mật khẩu phải có ít nhất 6 ký tự', 'error')
+      return
+    }
+    setIsSaving(true)
+    const success = await changePassword(passwords.current, passwords.new)
+    setIsSaving(false)
+    if (success) {
+      showToast('Đã đổi mật khẩu thành công!')
+      setPasswords({ current: '', new: '', confirm: '' })
+    } else {
+      showToast(error || 'Có lỗi xảy ra', 'error')
+    }
+  }
+
+  if (isLoading && !profile) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-64 mt-2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -142,38 +198,42 @@ function ProfileTab() {
             <div>
               <label className="text-sm font-medium">Họ và tên</label>
               <Input
-                value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                value={localProfile.name}
+                onChange={(e) => setLocalProfile({ ...localProfile, name: e.target.value })}
               />
             </div>
             <div>
               <label className="text-sm font-medium">Email</label>
               <Input
                 type="email"
-                value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                value={profile?.email || ''}
+                disabled
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground mt-1">Email không thể thay đổi</p>
             </div>
             <div>
               <label className="text-sm font-medium">Tên công ty</label>
               <Input
-                value={profile.company}
-                onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                value={localProfile.company}
+                onChange={(e) => setLocalProfile({ ...localProfile, company: e.target.value })}
+                placeholder="Công ty của bạn"
               />
             </div>
             <div>
               <label className="text-sm font-medium">Số điện thoại</label>
               <Input
-                value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                value={localProfile.phone}
+                onChange={(e) => setLocalProfile({ ...localProfile, phone: e.target.value })}
+                placeholder="0912 345 678"
               />
             </div>
           </div>
 
           <div className="flex justify-end pt-4">
-            <Button onClick={handleSave} disabled={isLoading}>
+            <Button onClick={handleSaveProfile} disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
-              {isLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
+              {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
             </Button>
           </div>
         </CardContent>
@@ -193,20 +253,41 @@ function ProfileTab() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Mật khẩu hiện tại</label>
-              <Input type="password" placeholder="••••••••" />
+              <Input 
+                type="password" 
+                placeholder="••••••••" 
+                value={passwords.current}
+                onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+              />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-sm font-medium">Mật khẩu mới</label>
-                <Input type="password" placeholder="••••••••" />
+                <Input 
+                  type="password" 
+                  placeholder="••••••••" 
+                  value={passwords.new}
+                  onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium">Xác nhận mật khẩu mới</label>
-                <Input type="password" placeholder="••••••••" />
+                <Input 
+                  type="password" 
+                  placeholder="••••••••" 
+                  value={passwords.confirm}
+                  onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                />
               </div>
             </div>
             <div className="flex justify-end pt-2">
-              <Button variant="outline">Đổi mật khẩu</Button>
+              <Button 
+                variant="outline" 
+                onClick={handleChangePassword}
+                disabled={isSaving || !passwords.current || !passwords.new}
+              >
+                {isSaving ? 'Đang đổi...' : 'Đổi mật khẩu'}
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -215,19 +296,48 @@ function ProfileTab() {
   )
 }
 
-// Notifications Tab
+// Notifications Tab with real API
 function NotificationsTab() {
-  const [settings, setSettings] = React.useState(mockNotificationSettings)
-  const [isLoading, setIsLoading] = React.useState(false)
+  const { settings, isLoading, error, fetchSettings, updateSettings } = useNotifications()
+  const [localSettings, setLocalSettings] = React.useState({
+    emailNewReview: true,
+    emailNegativeReview: true,
+    emailWeeklyReport: true,
+    zaloNewReview: false,
+    zaloNegativeReview: true,
+    pushEnabled: false,
+  })
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
-  const handleToggle = (key: keyof typeof settings) => {
-    setSettings({ ...settings, [key]: !settings[key] })
+  useEffect(() => {
+    fetchSettings()
+  }, [fetchSettings])
+
+  useEffect(() => {
+    if (settings) {
+      setLocalSettings(settings)
+    }
+  }, [settings])
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleToggle = (key: keyof typeof localSettings) => {
+    setLocalSettings({ ...localSettings, [key]: !localSettings[key] })
   }
 
   const handleSave = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsLoading(false)
+    setIsSaving(true)
+    const success = await updateSettings(localSettings)
+    setIsSaving(false)
+    if (success) {
+      showToast('Đã lưu cài đặt thông báo!')
+    } else {
+      showToast(error || 'Có lỗi xảy ra', 'error')
+    }
   }
 
   const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
@@ -245,8 +355,25 @@ function NotificationsTab() {
     </button>
   )
 
+  if (isLoading && !settings) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
+      {toast && <Toast message={toast.message} type={toast.type} />}
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="h-5 w-5" />
@@ -269,21 +396,21 @@ function NotificationsTab() {
                 <p className="font-medium text-sm">Đánh giá mới</p>
                 <p className="text-sm text-muted-foreground">Nhận email khi có đánh giá mới</p>
               </div>
-              <ToggleSwitch checked={settings.emailNewReview} onChange={() => handleToggle('emailNewReview')} />
+              <ToggleSwitch checked={localSettings.emailNewReview} onChange={() => handleToggle('emailNewReview')} />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-sm">Đánh giá tiêu cực</p>
                 <p className="text-sm text-muted-foreground">Nhận email ngay khi có đánh giá 1-2 sao</p>
               </div>
-              <ToggleSwitch checked={settings.emailNegativeReview} onChange={() => handleToggle('emailNegativeReview')} />
+              <ToggleSwitch checked={localSettings.emailNegativeReview} onChange={() => handleToggle('emailNegativeReview')} />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-sm">Báo cáo tuần</p>
                 <p className="text-sm text-muted-foreground">Nhận email tổng kết mỗi tuần</p>
               </div>
-              <ToggleSwitch checked={settings.emailWeeklyReport} onChange={() => handleToggle('emailWeeklyReport')} />
+              <ToggleSwitch checked={localSettings.emailWeeklyReport} onChange={() => handleToggle('emailWeeklyReport')} />
             </div>
           </div>
         </div>
@@ -300,22 +427,39 @@ function NotificationsTab() {
                 <p className="font-medium text-sm">Đánh giá mới</p>
                 <p className="text-sm text-muted-foreground">Nhận Zalo khi có đánh giá mới</p>
               </div>
-              <ToggleSwitch checked={settings.zaloNewReview} onChange={() => handleToggle('zaloNewReview')} />
+              <ToggleSwitch checked={localSettings.zaloNewReview} onChange={() => handleToggle('zaloNewReview')} />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-sm">Đánh giá tiêu cực</p>
                 <p className="text-sm text-muted-foreground">Nhận Zalo ngay khi có đánh giá tiêu cực</p>
               </div>
-              <ToggleSwitch checked={settings.zaloNegativeReview} onChange={() => handleToggle('zaloNegativeReview')} />
+              <ToggleSwitch checked={localSettings.zaloNegativeReview} onChange={() => handleToggle('zaloNegativeReview')} />
+            </div>
+          </div>
+        </div>
+
+        {/* Push Notifications */}
+        <div>
+          <h3 className="font-medium mb-4 flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Push Notifications
+          </h3>
+          <div className="space-y-4 pl-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-sm">Bật thông báo đẩy</p>
+                <p className="text-sm text-muted-foreground">Nhận thông báo trên trình duyệt</p>
+              </div>
+              <ToggleSwitch checked={localSettings.pushEnabled} onChange={() => handleToggle('pushEnabled')} />
             </div>
           </div>
         </div>
 
         <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSave} disabled={isLoading}>
+          <Button onClick={handleSave} disabled={isSaving}>
             <Save className="h-4 w-4 mr-2" />
-            {isLoading ? 'Đang lưu...' : 'Lưu cài đặt'}
+            {isSaving ? 'Đang lưu...' : 'Lưu cài đặt'}
           </Button>
         </div>
       </CardContent>
@@ -323,19 +467,66 @@ function NotificationsTab() {
   )
 }
 
-// Tone Settings Tab
+// Tone Settings Tab with real API
 function ToneSettingsTab() {
-  const [settings, setSettings] = React.useState(mockToneSettings)
-  const [isLoading, setIsLoading] = React.useState(false)
+  const { config, isLoading, error, fetchConfig, updateConfig } = useAIConfig()
+  const [localConfig, setLocalConfig] = React.useState({
+    defaultTone: 'FRIENDLY',
+    customInstructions: '',
+    includeBusinessName: true,
+    includeManagerSignature: false,
+    managerName: '',
+    preferredModel: 'gpt-4o-mini',
+    autoGenerateResponses: false,
+  })
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  useEffect(() => {
+    fetchConfig()
+  }, [fetchConfig])
+
+  useEffect(() => {
+    if (config) {
+      setLocalConfig(config)
+    }
+  }, [config])
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   const handleSave = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsLoading(false)
+    setIsSaving(true)
+    const success = await updateConfig(localConfig)
+    setIsSaving(false)
+    if (success) {
+      showToast('Đã lưu cài đặt AI!')
+    } else {
+      showToast(error || 'Có lỗi xảy ra', 'error')
+    }
+  }
+
+  if (isLoading && !config) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
     <Card>
+      {toast && <Toast message={toast.message} type={toast.type} />}
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Palette className="h-5 w-5" />
@@ -346,12 +537,35 @@ function ToneSettingsTab() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* AI Model */}
+        <div>
+          <label className="text-sm font-medium">Model AI</label>
+          <Select
+            value={localConfig.preferredModel}
+            onValueChange={(value) => setLocalConfig({ ...localConfig, preferredModel: value })}
+          >
+            <SelectTrigger className="mt-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {modelOptions.map((model) => (
+                <SelectItem key={model.value} value={model.value}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{model.label}</span>
+                    <span className="text-muted-foreground">- {model.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Default Tone */}
         <div>
           <label className="text-sm font-medium">Giọng điệu mặc định</label>
           <Select
-            value={settings.defaultTone}
-            onValueChange={(value) => setSettings({ ...settings, defaultTone: value })}
+            value={localConfig.defaultTone}
+            onValueChange={(value) => setLocalConfig({ ...localConfig, defaultTone: value })}
           >
             <SelectTrigger className="mt-2">
               <SelectValue />
@@ -375,8 +589,8 @@ function ToneSettingsTab() {
           <Textarea
             className="mt-2"
             placeholder="VD: Luôn nhắc khách hàng về chương trình khuyến mãi đang diễn ra. Đề cập hotline hỗ trợ khi cần..."
-            value={settings.customInstructions}
-            onChange={(e) => setSettings({ ...settings, customInstructions: e.target.value })}
+            value={localConfig.customInstructions}
+            onChange={(e) => setLocalConfig({ ...localConfig, customInstructions: e.target.value })}
             rows={4}
           />
           <p className="text-xs text-muted-foreground mt-1">
@@ -389,9 +603,22 @@ function ToneSettingsTab() {
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
+              id="autoGenerateResponses"
+              checked={localConfig.autoGenerateResponses}
+              onChange={(e) => setLocalConfig({ ...localConfig, autoGenerateResponses: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="autoGenerateResponses" className="text-sm">
+              Tự động tạo phản hồi AI cho đánh giá mới
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
               id="includeBusinessName"
-              checked={settings.includeBusinessName}
-              onChange={(e) => setSettings({ ...settings, includeBusinessName: e.target.checked })}
+              checked={localConfig.includeBusinessName}
+              onChange={(e) => setLocalConfig({ ...localConfig, includeBusinessName: e.target.checked })}
               className="h-4 w-4 rounded border-gray-300"
             />
             <label htmlFor="includeBusinessName" className="text-sm">
@@ -403,8 +630,8 @@ function ToneSettingsTab() {
             <input
               type="checkbox"
               id="includeManagerSignature"
-              checked={settings.includeManagerSignature}
-              onChange={(e) => setSettings({ ...settings, includeManagerSignature: e.target.checked })}
+              checked={localConfig.includeManagerSignature}
+              onChange={(e) => setLocalConfig({ ...localConfig, includeManagerSignature: e.target.checked })}
               className="h-4 w-4 rounded border-gray-300"
             />
             <label htmlFor="includeManagerSignature" className="text-sm">
@@ -412,21 +639,21 @@ function ToneSettingsTab() {
             </label>
           </div>
 
-          {settings.includeManagerSignature && (
+          {localConfig.includeManagerSignature && (
             <div className="pl-7">
               <Input
                 placeholder="Tên người quản lý (VD: Nguyễn Văn A - Quản lý)"
-                value={settings.managerName}
-                onChange={(e) => setSettings({ ...settings, managerName: e.target.value })}
+                value={localConfig.managerName}
+                onChange={(e) => setLocalConfig({ ...localConfig, managerName: e.target.value })}
               />
             </div>
           )}
         </div>
 
         <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSave} disabled={isLoading}>
+          <Button onClick={handleSave} disabled={isSaving}>
             <Save className="h-4 w-4 mr-2" />
-            {isLoading ? 'Đang lưu...' : 'Lưu cài đặt'}
+            {isSaving ? 'Đang lưu...' : 'Lưu cài đặt'}
           </Button>
         </div>
       </CardContent>
@@ -434,20 +661,63 @@ function ToneSettingsTab() {
   )
 }
 
-// Templates Tab
+// Templates Tab with real API
 function TemplatesTab() {
-  const [templates, setTemplates] = React.useState(mockTemplates)
+  const { templates, isLoading, fetchTemplates, createTemplate, updateTemplate, deleteTemplate } = useTemplates()
   const [showAddModal, setShowAddModal] = React.useState(false)
-  const [editingTemplate, setEditingTemplate] = React.useState<typeof mockTemplates[0] | null>(null)
+  const [editingTemplate, setEditingTemplate] = React.useState<typeof templates[0] | null>(null)
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
-  const handleDelete = (id: string) => {
+  useEffect(() => {
+    fetchTemplates()
+  }, [fetchTemplates])
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleDelete = async (id: string) => {
     if (confirm('Bạn có chắc muốn xóa template này?')) {
-      setTemplates(templates.filter(t => t.id !== id))
+      const success = await deleteTemplate(id)
+      if (success) {
+        showToast('Đã xóa template!')
+      } else {
+        showToast('Không thể xóa template', 'error')
+      }
     }
+  }
+
+  const handleCreateTemplate = async (data: { name: string; content: string; tone: string }) => {
+    const result = await createTemplate(data)
+    if (result) {
+      showToast('Đã tạo template mới!')
+      setShowAddModal(false)
+    } else {
+      showToast('Không thể tạo template', 'error')
+    }
+  }
+
+  if (isLoading && templates.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -471,6 +741,10 @@ function TemplatesTab() {
             <div className="text-center py-8">
               <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">Chưa có template nào</p>
+              <Button variant="outline" className="mt-4" onClick={() => setShowAddModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tạo template đầu tiên
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -484,30 +758,35 @@ function TemplatesTab() {
                       <h4 className="font-medium">{template.name}</h4>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-xs">
-                          {toneOptions.find(t => t.value === template.tone)?.label}
+                          {toneOptions.find(t => t.value === template.tone)?.label || template.tone}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
-                          Đã dùng {template.useCount} lần
+                          Đã dùng {template.usageCount} lần
                         </span>
+                        {!template.userId && (
+                          <Badge variant="secondary" className="text-xs">Hệ thống</Badge>
+                        )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingTemplate(template)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-700"
-                        onClick={() => handleDelete(template.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {template.userId && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingTemplate(template)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-700"
+                          onClick={() => handleDelete(template.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
                     {template.content}
@@ -535,21 +814,192 @@ function TemplatesTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Template Modal */}
+      {showAddModal && (
+        <AddTemplateModal
+          onClose={() => setShowAddModal(false)}
+          onSubmit={handleCreateTemplate}
+        />
+      )}
+
+      {/* Edit Template Modal */}
+      {editingTemplate && (
+        <EditTemplateModal
+          template={editingTemplate}
+          onClose={() => setEditingTemplate(null)}
+          onSubmit={async (data) => {
+            const result = await updateTemplate(editingTemplate.id, data)
+            if (result) {
+              showToast('Đã cập nhật template!')
+              setEditingTemplate(null)
+            } else {
+              showToast('Không thể cập nhật template', 'error')
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Add Template Modal
+function AddTemplateModal({ onClose, onSubmit }: {
+  onClose: () => void
+  onSubmit: (data: { name: string; content: string; tone: string }) => void
+}) {
+  const [name, setName] = React.useState('')
+  const [content, setContent] = React.useState('')
+  const [tone, setTone] = React.useState('PROFESSIONAL')
+  const [isLoading, setIsLoading] = React.useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    await onSubmit({ name, content, tone })
+    setIsLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg p-6 m-4">
+        <h2 className="text-xl font-bold mb-4">Thêm Template Mới</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Tên template</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="VD: Cảm ơn đánh giá 5 sao"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Giọng điệu</label>
+            <Select value={tone} onValueChange={setTone}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {toneOptions.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Nội dung</label>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Cảm ơn {customerName} đã dành thời gian đánh giá {businessName}..."
+              rows={4}
+              required
+            />
+          </div>
+          
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={isLoading || !name || !content}>
+              {isLoading ? 'Đang tạo...' : 'Tạo template'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Edit Template Modal
+function EditTemplateModal({ template, onClose, onSubmit }: {
+  template: { id: string; name: string; content: string; tone: string }
+  onClose: () => void
+  onSubmit: (data: { name: string; content: string; tone: string }) => void
+}) {
+  const [name, setName] = React.useState(template.name)
+  const [content, setContent] = React.useState(template.content)
+  const [tone, setTone] = React.useState(template.tone)
+  const [isLoading, setIsLoading] = React.useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    await onSubmit({ name, content, tone })
+    setIsLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg p-6 m-4">
+        <h2 className="text-xl font-bold mb-4">Chỉnh sửa Template</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Tên template</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Giọng điệu</label>
+            <Select value={tone} onValueChange={setTone}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {toneOptions.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Nội dung</label>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={4}
+              required
+            />
+          </div>
+          
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={isLoading || !name || !content}>
+              {isLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
 
 // API Keys Tab
 function ApiKeysTab() {
-  const [showKey, setShowKey] = React.useState<{ [key: string]: boolean }>({})
-
   const apiKeys = [
     {
       id: 'openai',
       name: 'OpenAI API Key',
       icon: <Sparkles className="h-5 w-5" />,
       description: 'Dùng cho GPT-4o-mini tạo phản hồi',
-      value: 'sk-proj-xxxxxxxxxxxxxxxxxxxxx',
       connected: true,
     },
     {
@@ -557,7 +1007,6 @@ function ApiKeysTab() {
       name: 'Google Business Profile',
       icon: <Globe className="h-5 w-5" />,
       description: 'OAuth credentials cho GBP',
-      value: '',
       connected: true,
     },
     {
@@ -565,7 +1014,6 @@ function ApiKeysTab() {
       name: 'Zalo OA API',
       icon: <MessageSquare className="h-5 w-5" />,
       description: 'App ID và Secret cho Zalo',
-      value: '',
       connected: false,
     },
   ]
@@ -578,7 +1026,7 @@ function ApiKeysTab() {
           API Keys & Integrations
         </CardTitle>
         <CardDescription>
-          Quản lý các kết nối API của bạn
+          Quản lý các kết nối API của bạn. API keys được cấu hình bởi quản trị viên.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -595,7 +1043,7 @@ function ApiKeysTab() {
                 <div className="flex items-center gap-2">
                   <h4 className="font-medium">{api.name}</h4>
                   {api.connected ? (
-                    <Badge variant="success" className="text-xs gap-1">
+                    <Badge className="text-xs gap-1 bg-green-100 text-green-800">
                       <CheckCircle2 className="h-3 w-3" />
                       Đã kết nối
                     </Badge>
@@ -609,10 +1057,17 @@ function ApiKeysTab() {
               </div>
             </div>
             <Button variant="outline" size="sm">
-              {api.connected ? 'Cấu hình' : 'Kết nối'}
+              {api.connected ? 'Xem chi tiết' : 'Liên hệ Admin'}
             </Button>
           </div>
         ))}
+
+        <div className="pt-4 border-t">
+          <p className="text-sm text-muted-foreground">
+            <AlertCircle className="h-4 w-4 inline mr-1" />
+            API keys được quản lý ở cấp hệ thống để đảm bảo bảo mật.
+          </p>
+        </div>
       </CardContent>
     </Card>
   )
@@ -620,6 +1075,30 @@ function ApiKeysTab() {
 
 // Billing Tab
 function BillingTab() {
+  const [isLoading, setIsLoading] = React.useState(false)
+
+  const handleUpgrade = async (plan: string) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/subscription/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      
+      if (response.ok) {
+        const { url } = await response.json()
+        if (url) {
+          window.location.href = url
+        }
+      }
+    } catch (error) {
+      console.error('Checkout error:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const currentPlan = {
     name: 'Free',
     price: 0,
@@ -629,7 +1108,6 @@ function BillingTab() {
 
   return (
     <div className="space-y-6">
-      {/* Current Plan */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -645,10 +1123,11 @@ function BillingTab() {
                 {currentPlan.price === 0 ? 'Miễn phí' : `$${currentPlan.price}/tháng`}
               </p>
             </div>
-            <Button>Nâng cấp gói</Button>
+            <Button onClick={() => handleUpgrade('ESSENTIAL')} disabled={isLoading}>
+              {isLoading ? 'Đang xử lý...' : 'Nâng cấp gói'}
+            </Button>
           </div>
 
-          {/* Usage */}
           <div className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2">
@@ -679,7 +1158,6 @@ function BillingTab() {
         </CardContent>
       </Card>
 
-      {/* Pricing Plans */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-2 border-blue-500">
           <CardHeader>
@@ -706,9 +1184,11 @@ function BillingTab() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2 border-purple-200 relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-purple-600 text-white text-xs px-3 py-1 rounded-bl-lg">
+            Phổ biến
+          </div>
           <CardHeader>
-            <Badge variant="secondary" className="w-fit">Phổ biến</Badge>
             <CardTitle>Essential</CardTitle>
             <CardDescription>Dành cho SME đa địa điểm</CardDescription>
             <div className="text-3xl font-bold">$19<span className="text-base font-normal text-muted-foreground">/tháng</span></div>
@@ -728,7 +1208,13 @@ function BillingTab() {
                 Tích hợp Zalo OA
               </li>
             </ul>
-            <Button className="w-full">Nâng cấp</Button>
+            <Button 
+              className="w-full" 
+              onClick={() => handleUpgrade('ESSENTIAL')}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Đang xử lý...' : 'Nâng cấp'}
+            </Button>
           </CardContent>
         </Card>
 
@@ -754,7 +1240,14 @@ function BillingTab() {
                 Hỗ trợ ưu tiên
               </li>
             </ul>
-            <Button variant="outline" className="w-full">Liên hệ</Button>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => handleUpgrade('PROFESSIONAL')}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Đang xử lý...' : 'Liên hệ'}
+            </Button>
           </CardContent>
         </Card>
       </div>

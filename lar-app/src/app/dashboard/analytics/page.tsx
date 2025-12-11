@@ -6,6 +6,7 @@ import { AnalyticsDashboard } from '@/components/analytics/dashboard'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ import {
   LineChart,
   ArrowUpRight,
   ArrowDownRight,
+  AlertCircle,
 } from 'lucide-react'
 import {
   BarChart,
@@ -40,9 +42,10 @@ import {
   AreaChart,
   Area,
 } from 'recharts'
+import { useAnalytics, useLocations } from '@/hooks'
 
-// Mock data
-const mockDashboardData = {
+// Fallback data for development/error states
+const fallbackDashboardData = {
   overview: {
     totalReviews: 312,
     averageRating: 4.4,
@@ -114,7 +117,35 @@ const dateRangeOptions = [
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = React.useState('30d')
   const [selectedLocation, setSelectedLocation] = React.useState('all')
-  const [isLoading, setIsLoading] = React.useState(false)
+
+  // Convert date range to days
+  const getDaysFromRange = (range: string): number => {
+    switch (range) {
+      case '7d': return 7
+      case '30d': return 30
+      case '90d': return 90
+      case '6m': return 180
+      case '1y': return 365
+      default: return 30
+    }
+  }
+
+  // Fetch analytics data from API
+  const { 
+    data: apiData, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useAnalytics({
+    locationId: selectedLocation === 'all' ? undefined : selectedLocation,
+    days: getDaysFromRange(dateRange),
+  })
+
+  // Fetch locations for filter dropdown  
+  const { locations } = useLocations()
+
+  // Use API data or fallback
+  const dashboardData = apiData?.overview?.totalReviews > 0 ? apiData : fallbackDashboardData
 
   const handleExport = () => {
     // Simulate export
@@ -122,9 +153,7 @@ export default function AnalyticsPage() {
   }
 
   const handleRefresh = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
+    await refetch()
   }
 
   // Calculate comparison stats
@@ -153,10 +182,11 @@ export default function AnalyticsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả địa điểm</SelectItem>
-                <SelectItem value="1">Chi nhánh Q1</SelectItem>
-                <SelectItem value="2">Chi nhánh Q3</SelectItem>
-                <SelectItem value="3">Chi nhánh Q7</SelectItem>
-                <SelectItem value="4">Spa Bình Thạnh</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             
@@ -193,7 +223,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Tổng đánh giá</p>
-                  <p className="text-3xl font-bold">{mockDashboardData.overview.totalReviews}</p>
+                  <p className="text-3xl font-bold">{dashboardData?.overview.totalReviews ?? 0}</p>
                   <div className="flex items-center gap-1 mt-1">
                     {stats.reviewsChange > 0 ? (
                       <>
@@ -221,7 +251,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Điểm trung bình</p>
-                  <p className="text-3xl font-bold">{mockDashboardData.overview.averageRating}</p>
+                  <p className="text-3xl font-bold">{dashboardData?.overview.averageRating ?? 0}</p>
                   <div className="flex items-center gap-1 mt-1">
                     {stats.ratingChange > 0 ? (
                       <>
@@ -249,7 +279,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Tỷ lệ phản hồi</p>
-                  <p className="text-3xl font-bold">{mockDashboardData.overview.responseRate}%</p>
+                  <p className="text-3xl font-bold">{dashboardData?.overview.responseRate ?? 0}%</p>
                   <div className="flex items-center gap-1 mt-1">
                     <ArrowUpRight className="h-4 w-4 text-green-600" />
                     <span className="text-sm text-green-600">+{stats.responseRateChange}%</span>
@@ -268,7 +298,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Đánh giá tích cực</p>
-                  <p className="text-3xl font-bold">{mockDashboardData.sentimentPercentage.positive}%</p>
+                  <p className="text-3xl font-bold">{dashboardData?.sentimentPercentage.positive ?? 0}%</p>
                   <div className="flex items-center gap-1 mt-1">
                     <ArrowUpRight className="h-4 w-4 text-green-600" />
                     <span className="text-sm text-green-600">+{stats.positiveChange}%</span>
@@ -284,7 +314,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Main Dashboard Component */}
-        <AnalyticsDashboard data={mockDashboardData} />
+        {dashboardData && <AnalyticsDashboard data={dashboardData} />}
 
         {/* Additional Charts */}
         <div className="grid gap-6 md:grid-cols-2">

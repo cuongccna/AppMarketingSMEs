@@ -1,89 +1,55 @@
 'use client'
 
-import React from 'react'
-import { useSession } from 'next-auth/react'
+import React, { useEffect } from 'react'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Plus,
   Building2,
   MapPin,
-  ExternalLink,
   Settings,
   Trash2,
   RefreshCw,
   CheckCircle2,
-  XCircle,
   Link as LinkIcon,
   Chrome,
   MessageSquare,
+  AlertCircle,
 } from 'lucide-react'
+import { useBusinesses } from '@/hooks'
 
-// Type definitions
-interface Business {
-  id: string
-  name: string
-  category: string
-  locations: number
-  totalReviews: number
-  averageRating: number
-  platforms: {
-    gbp: { connected: boolean; lastSync: string | null }
-    zalo: { connected: boolean; lastSync: string | null }
-  }
+// Toast notification
+function Toast({ message, type = 'success' }: { message: string; type?: 'success' | 'error' }) {
+  return (
+    <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
+      type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+    }`}>
+      {type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+      {message}
+    </div>
+  )
 }
-
-// Mock data for businesses
-const mockBusinesses: Business[] = [
-  {
-    id: '1',
-    name: 'Quán Cơm Nhà Làm',
-    category: 'Nhà hàng',
-    locations: 3,
-    totalReviews: 156,
-    averageRating: 4.5,
-    platforms: {
-      gbp: { connected: true, lastSync: '2025-12-08T10:00:00Z' },
-      zalo: { connected: true, lastSync: '2025-12-08T09:30:00Z' },
-    },
-  },
-  {
-    id: '2',
-    name: 'Spa Làm Đẹp Sài Gòn',
-    category: 'Spa & Làm đẹp',
-    locations: 2,
-    totalReviews: 89,
-    averageRating: 4.8,
-    platforms: {
-      gbp: { connected: true, lastSync: '2025-12-08T08:00:00Z' },
-      zalo: { connected: false, lastSync: null },
-    },
-  },
-]
 
 interface AddBusinessModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: { name: string; category: string }) => void
+  onSubmit: (data: { name: string; category: string }) => Promise<void>
+  isLoading: boolean
 }
 
-function AddBusinessModal({ isOpen, onClose, onSubmit }: AddBusinessModalProps) {
+function AddBusinessModal({ isOpen, onClose, onSubmit, isLoading }: AddBusinessModalProps) {
   const [name, setName] = React.useState('')
   const [category, setCategory] = React.useState('')
-  const [isLoading, setIsLoading] = React.useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 500))
-    onSubmit({ name, category })
+    await onSubmit({ name, category })
     setName('')
     setCategory('')
-    setIsLoading(false)
-    onClose()
   }
 
   if (!isOpen) return null
@@ -91,7 +57,7 @@ function AddBusinessModal({ isOpen, onClose, onSubmit }: AddBusinessModalProps) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6 m-4">
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md p-6 m-4">
         <h2 className="text-xl font-bold mb-4">Thêm Doanh Nghiệp Mới</h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -111,7 +77,6 @@ function AddBusinessModal({ isOpen, onClose, onSubmit }: AddBusinessModalProps) 
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="VD: Nhà hàng, Spa, Cửa hàng..."
-              required
             />
           </div>
 
@@ -119,7 +84,7 @@ function AddBusinessModal({ isOpen, onClose, onSubmit }: AddBusinessModalProps) 
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
               Hủy
             </Button>
-            <Button type="submit" className="flex-1" disabled={isLoading}>
+            <Button type="submit" className="flex-1" disabled={isLoading || !name}>
               {isLoading ? 'Đang tạo...' : 'Tạo doanh nghiệp'}
             </Button>
           </div>
@@ -132,143 +97,216 @@ function AddBusinessModal({ isOpen, onClose, onSubmit }: AddBusinessModalProps) 
 interface ConnectPlatformModalProps {
   isOpen: boolean
   onClose: () => void
-  business: typeof mockBusinesses[0] | null
+  businessId: string
+  businessName: string
   platform: 'gbp' | 'zalo'
+  onConnect: (data: { platform: string; externalId: string; locationId: string }) => Promise<void>
+  isLoading: boolean
+  locations: Array<{ id: string; name: string }>
 }
 
-function ConnectPlatformModal({ isOpen, onClose, business, platform }: ConnectPlatformModalProps) {
-  const [isConnecting, setIsConnecting] = React.useState(false)
-
-  const handleConnect = async () => {
-    setIsConnecting(true)
-    // Simulate OAuth flow
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsConnecting(false)
-    onClose()
-  }
-
-  if (!isOpen || !business) return null
+function ConnectPlatformModal({ 
+  isOpen, 
+  onClose, 
+  businessName, 
+  platform,
+  onConnect,
+  isLoading,
+  locations
+}: ConnectPlatformModalProps) {
+  const [externalId, setExternalId] = React.useState('')
+  const [selectedLocation, setSelectedLocation] = React.useState('')
 
   const platformInfo = {
     gbp: {
       name: 'Google Business Profile',
       icon: <Chrome className="h-8 w-8 text-blue-500" />,
       description: 'Kết nối với Google Business Profile để đồng bộ đánh giá từ Google Maps và Search.',
-      steps: [
-        'Đăng nhập vào tài khoản Google của bạn',
-        'Chọn địa điểm doanh nghiệp cần kết nối',
-        'Cấp quyền cho LAR đọc và phản hồi đánh giá',
-      ],
+      placeholder: 'Place ID hoặc Account ID',
     },
     zalo: {
       name: 'Zalo Official Account',
       icon: <MessageSquare className="h-8 w-8 text-blue-600" />,
       description: 'Kết nối Zalo OA để nhận đánh giá và gửi thông báo qua Zalo.',
-      steps: [
-        'Đăng nhập vào Zalo for Developers',
-        'Chọn Official Account cần kết nối',
-        'Cấp quyền cho LAR quản lý tin nhắn',
-      ],
+      placeholder: 'OA ID',
     },
   }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const platformMap = {
+      gbp: 'GOOGLE_BUSINESS_PROFILE',
+      zalo: 'ZALO_OA',
+    }
+    await onConnect({
+      platform: platformMap[platform],
+      externalId,
+      locationId: selectedLocation,
+    })
+    setExternalId('')
+    setSelectedLocation('')
+  }
+
+  if (!isOpen) return null
 
   const info = platformInfo[platform]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6 m-4">
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg p-6 m-4">
         <div className="flex items-center gap-4 mb-6">
           {info.icon}
           <div>
             <h2 className="text-xl font-bold">Kết nối {info.name}</h2>
-            <p className="text-sm text-muted-foreground">{business.name}</p>
+            <p className="text-sm text-muted-foreground">{businessName}</p>
           </div>
         </div>
 
         <p className="text-sm text-gray-600 mb-6">{info.description}</p>
 
-        <div className="bg-gray-50 rounded-lg p-4 mb-6">
-          <h3 className="font-medium mb-3">Các bước thực hiện:</h3>
-          <ol className="space-y-2">
-            {info.steps.map((step, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm">
-                <span className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-medium">
-                  {i + 1}
-                </span>
-                {step}
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        <div className="flex gap-3">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            Hủy
-          </Button>
-          <Button className="flex-1" onClick={handleConnect} disabled={isConnecting}>
-            {isConnecting ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Đang kết nối...
-              </>
-            ) : (
-              <>
-                <LinkIcon className="h-4 w-4 mr-2" />
-                Kết nối ngay
-              </>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Chọn địa điểm</label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="w-full mt-1 px-3 py-2 border rounded-lg bg-background"
+              required
+            >
+              <option value="">-- Chọn địa điểm --</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>{loc.name}</option>
+              ))}
+            </select>
+            {locations.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Chưa có địa điểm nào. Vui lòng tạo địa điểm trước.
+              </p>
             )}
-          </Button>
-        </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">{info.placeholder}</label>
+            <Input
+              value={externalId}
+              onChange={(e) => setExternalId(e.target.value)}
+              placeholder={info.placeholder}
+              required
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+              Hủy
+            </Button>
+            <Button 
+              type="submit" 
+              className="flex-1" 
+              disabled={isLoading || !externalId || !selectedLocation}
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Đang kết nối...
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="h-4 w-4 mr-2" />
+                  Kết nối ngay
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   )
 }
 
 export default function BusinessesPage() {
-  const { data: session } = useSession()
-  const [businesses, setBusinesses] = React.useState(mockBusinesses)
+  const { 
+    businesses, 
+    isLoading, 
+    error,
+    fetchBusinesses, 
+    createBusiness, 
+    deleteBusiness, 
+    connectPlatform 
+  } = useBusinesses()
+  
   const [showAddModal, setShowAddModal] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [syncingId, setSyncingId] = React.useState<string | null>(null)
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [connectModal, setConnectModal] = React.useState<{
     isOpen: boolean
-    business: typeof mockBusinesses[0] | null
+    businessId: string
+    businessName: string
     platform: 'gbp' | 'zalo'
+    locations: Array<{ id: string; name: string }>
   }>({
     isOpen: false,
-    business: null,
+    businessId: '',
+    businessName: '',
     platform: 'gbp',
+    locations: [],
   })
-  const [syncingId, setSyncingId] = React.useState<string | null>(null)
 
-  const handleAddBusiness = (data: { name: string; category: string }) => {
-    const newBusiness = {
-      id: Date.now().toString(),
-      name: data.name,
-      category: data.category,
-      locations: 0,
-      totalReviews: 0,
-      averageRating: 0,
-      platforms: {
-        gbp: { connected: false, lastSync: null },
-        zalo: { connected: false, lastSync: null },
-      },
+  useEffect(() => {
+    fetchBusinesses()
+  }, [fetchBusinesses])
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleAddBusiness = async (data: { name: string; category: string }) => {
+    setIsSaving(true)
+    const result = await createBusiness(data)
+    setIsSaving(false)
+    if (result) {
+      showToast('Đã tạo doanh nghiệp thành công!')
+      setShowAddModal(false)
+    } else {
+      showToast(error || 'Không thể tạo doanh nghiệp', 'error')
     }
-    setBusinesses([...businesses, newBusiness])
   }
 
   const handleSync = async (businessId: string) => {
     setSyncingId(businessId)
+    // TODO: Implement actual sync logic
     await new Promise(resolve => setTimeout(resolve, 2000))
+    await fetchBusinesses()
     setSyncingId(null)
+    showToast('Đã đồng bộ thành công!')
   }
 
-  const handleDelete = (businessId: string) => {
+  const handleDelete = async (businessId: string) => {
     if (confirm('Bạn có chắc muốn xóa doanh nghiệp này? Hành động này không thể hoàn tác.')) {
-      setBusinesses(businesses.filter(b => b.id !== businessId))
+      const success = await deleteBusiness(businessId)
+      if (success) {
+        showToast('Đã xóa doanh nghiệp!')
+      } else {
+        showToast('Không thể xóa doanh nghiệp', 'error')
+      }
     }
   }
 
-  const formatLastSync = (dateStr: string | null) => {
+  const handleConnectPlatform = async (data: { platform: string; externalId: string; locationId: string }) => {
+    setIsSaving(true)
+    const result = await connectPlatform(connectModal.businessId, data)
+    setIsSaving(false)
+    if (result) {
+      showToast(`Đã kết nối ${data.platform === 'GOOGLE_BUSINESS_PROFILE' ? 'Google Business Profile' : 'Zalo OA'}!`)
+      setConnectModal({ ...connectModal, isOpen: false })
+    } else {
+      showToast('Không thể kết nối platform', 'error')
+    }
+  }
+
+  const formatLastSync = (dateStr: string | null | undefined) => {
     if (!dateStr) return 'Chưa đồng bộ'
     const date = new Date(dateStr)
     const now = new Date()
@@ -279,8 +317,69 @@ export default function BusinessesPage() {
     return date.toLocaleDateString('vi-VN')
   }
 
+  // Transform API data for display
+  const businessesWithStats = businesses.map((b: any) => {
+    const locations = b.locations || []
+    const totalReviews = locations.reduce((sum: number, loc: any) => sum + (loc._count?.reviews || 0), 0)
+    
+    // Check platform connections across all locations
+    const hasGbp = locations.some((loc: any) => 
+      loc.platformConnections?.some((pc: any) => pc.platform === 'GOOGLE_BUSINESS_PROFILE' && pc.isConnected)
+    )
+    const hasZalo = locations.some((loc: any) => 
+      loc.platformConnections?.some((pc: any) => pc.platform === 'ZALO_OA' && pc.isConnected)
+    )
+    
+    const gbpConnection = locations.flatMap((loc: any) => loc.platformConnections || [])
+      .find((pc: any) => pc.platform === 'GOOGLE_BUSINESS_PROFILE')
+    const zaloConnection = locations.flatMap((loc: any) => loc.platformConnections || [])
+      .find((pc: any) => pc.platform === 'ZALO_OA')
+
+    return {
+      ...b,
+      locationCount: locations.length,
+      totalReviews,
+      platforms: {
+        gbp: { connected: hasGbp, lastSync: gbpConnection?.lastSyncAt },
+        zalo: { connected: hasZalo, lastSync: zaloConnection?.lastSyncAt },
+      },
+    }
+  })
+
+  if (isLoading && businesses.length === 0) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-10 w-40" />
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            {[1, 2].map(i => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-32 mt-2" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      
       <div className="space-y-6">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -297,7 +396,7 @@ export default function BusinessesPage() {
         </div>
 
         {/* Empty State */}
-        {businesses.length === 0 && (
+        {businessesWithStats.length === 0 && (
           <Card className="py-12">
             <CardContent className="text-center">
               <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -315,7 +414,7 @@ export default function BusinessesPage() {
 
         {/* Business Cards */}
         <div className="grid gap-6 md:grid-cols-2">
-          {businesses.map((business) => (
+          {businessesWithStats.map((business: any) => (
             <Card key={business.id} className="overflow-hidden">
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
@@ -324,7 +423,7 @@ export default function BusinessesPage() {
                       <Building2 className="h-5 w-5 text-blue-600" />
                       {business.name}
                     </CardTitle>
-                    <CardDescription>{business.category}</CardDescription>
+                    <CardDescription>{business.category || 'Chưa phân loại'}</CardDescription>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -352,9 +451,9 @@ export default function BusinessesPage() {
 
               <CardContent className="space-y-4">
                 {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{business.locations}</div>
+                    <div className="text-2xl font-bold text-blue-600">{business.locationCount}</div>
                     <div className="text-xs text-muted-foreground">Địa điểm</div>
                   </div>
                   <div className="text-center">
@@ -362,7 +461,7 @@ export default function BusinessesPage() {
                     <div className="text-xs text-muted-foreground">Đánh giá</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-600">{business.averageRating}</div>
+                    <div className="text-2xl font-bold text-yellow-600">-</div>
                     <div className="text-xs text-muted-foreground">Điểm TB</div>
                   </div>
                 </div>
@@ -386,7 +485,7 @@ export default function BusinessesPage() {
                       </div>
                     </div>
                     {business.platforms.gbp.connected ? (
-                      <Badge variant="success" className="gap-1">
+                      <Badge className="gap-1 bg-green-100 text-green-800">
                         <CheckCircle2 className="h-3 w-3" />
                         Đã kết nối
                       </Badge>
@@ -396,11 +495,14 @@ export default function BusinessesPage() {
                         variant="outline"
                         onClick={() => setConnectModal({
                           isOpen: true,
-                          business,
+                          businessId: business.id,
+                          businessName: business.name,
                           platform: 'gbp',
+                          locations: (business.locations || []).map((l: any) => ({ id: l.id, name: l.name })),
                         })}
+                        disabled={business.locationCount === 0}
                       >
-                        Kết nối
+                        {business.locationCount === 0 ? 'Tạo địa điểm trước' : 'Kết nối'}
                       </Button>
                     )}
                   </div>
@@ -420,7 +522,7 @@ export default function BusinessesPage() {
                       </div>
                     </div>
                     {business.platforms.zalo.connected ? (
-                      <Badge variant="success" className="gap-1">
+                      <Badge className="gap-1 bg-green-100 text-green-800">
                         <CheckCircle2 className="h-3 w-3" />
                         Đã kết nối
                       </Badge>
@@ -430,11 +532,14 @@ export default function BusinessesPage() {
                         variant="outline"
                         onClick={() => setConnectModal({
                           isOpen: true,
-                          business,
+                          businessId: business.id,
+                          businessName: business.name,
                           platform: 'zalo',
+                          locations: (business.locations || []).map((l: any) => ({ id: l.id, name: l.name })),
                         })}
+                        disabled={business.locationCount === 0}
                       >
-                        Kết nối
+                        {business.locationCount === 0 ? 'Tạo địa điểm trước' : 'Kết nối'}
                       </Button>
                     )}
                   </div>
@@ -466,13 +571,18 @@ export default function BusinessesPage() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={handleAddBusiness}
+        isLoading={isSaving}
       />
 
       <ConnectPlatformModal
         isOpen={connectModal.isOpen}
         onClose={() => setConnectModal({ ...connectModal, isOpen: false })}
-        business={connectModal.business}
+        businessId={connectModal.businessId}
+        businessName={connectModal.businessName}
         platform={connectModal.platform}
+        onConnect={handleConnectPlatform}
+        isLoading={isSaving}
+        locations={connectModal.locations}
       />
     </DashboardLayout>
   )

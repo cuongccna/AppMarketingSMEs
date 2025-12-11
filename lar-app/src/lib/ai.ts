@@ -1,13 +1,50 @@
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// OpenAI Client (GPT-4o-mini for cost optimization as per report)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Preferred model from settings (can be overridden per request)
+export type AIProvider = 'openai' | 'gemini' | 'auto'
 
-// Google Gemini Client (Alternative low-cost LLM)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+/**
+ * Check if OpenAI is configured (dynamic check)
+ */
+function checkOpenAIConfigured(): boolean {
+  const key = process.env.OPENAI_API_KEY
+  return !!(key && key !== 'your-openai-api-key' && key.startsWith('sk-'))
+}
+
+/**
+ * Check if Gemini is configured (dynamic check)
+ */
+function checkGeminiConfigured(): boolean {
+  const key = process.env.GEMINI_API_KEY
+  return !!(key && key !== 'your-gemini-api-key' && key.startsWith('AIza'))
+}
+
+/**
+ * Get OpenAI client (lazy initialization)
+ */
+function getOpenAIClient(): OpenAI | null {
+  if (!checkOpenAIConfigured()) return null
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
+
+/**
+ * Get Gemini client (lazy initialization)
+ */
+function getGeminiClient(): GoogleGenerativeAI | null {
+  if (!checkGeminiConfigured()) return null
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+}
+
+/**
+ * Get available AI providers
+ */
+export function getAvailableProviders(): { openai: boolean; gemini: boolean } {
+  return {
+    openai: checkOpenAIConfigured(),
+    gemini: checkGeminiConfigured(),
+  }
+}
 
 export type ToneType = 'FRIENDLY' | 'PROFESSIONAL' | 'EMPATHETIC' | 'CONCISE' | 'FORMAL'
 export type Sentiment = 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE'
@@ -21,6 +58,7 @@ interface GenerateResponseParams {
   businessCategory?: string
   tone: ToneType
   language?: 'vi' | 'en'
+  preferredProvider?: AIProvider
 }
 
 interface SentimentAnalysisResult {
@@ -40,14 +78,66 @@ const TONE_PROMPTS: Record<ToneType, string> = {
 }
 
 /**
- * Generate AI response for a review using OpenAI GPT-4o-mini
- * Cost: ~$0.15/1M input tokens, ~$0.60/1M output tokens
+ * Generate AI response for a review - Smart fallback between OpenAI and Gemini
+ * - If preferredProvider is 'auto' or not specified: tries OpenAI first, falls back to Gemini
+ * - If preferredProvider is 'openai': only uses OpenAI
+ * - If preferredProvider is 'gemini': only uses Gemini
+ * 
+ * Cost comparison:
+ * - OpenAI GPT-4o-mini: ~$0.15/1M input, ~$0.60/1M output
+ * - Gemini 1.5 Flash: ~$0.075/1M input, ~$0.30/1M output
  */
 export async function generateReviewResponse(params: GenerateResponseParams): Promise<{
   response: string
   tokensUsed: number
   model: string
+  provider: AIProvider
 }> {
+  const { preferredProvider = 'auto' } = params
+  
+  // Determine which provider to use (dynamic check)
+  const useOpenAI = (preferredProvider === 'openai' || preferredProvider === 'auto') && checkOpenAIConfigured()
+  const useGemini = (preferredProvider === 'gemini' || preferredProvider === 'auto') && checkGeminiConfigured()
+  
+  if (!useOpenAI && !useGemini) {
+    throw new Error('Chưa cấu hình API key cho AI. Vui lòng thêm OPENAI_API_KEY hoặc GEMINI_API_KEY.')
+  }
+  
+  // Try preferred provider first
+  if (preferredProvider === 'gemini' && useGemini) {
+    return generateWithGemini(params)
+  }
+  
+  if (useOpenAI) {
+    try {
+      return await generateWithOpenAI(params)
+    } catch (error) {
+      console.error('OpenAI failed, trying Gemini fallback:', error)
+      if (useGemini) {
+        return generateWithGemini(params)
+      }
+      throw error
+    }
+  }
+  
+  // Fallback to Gemini if OpenAI not available
+  return generateWithGemini(params)
+}
+
+/**
+ * Generate response using OpenAI GPT-4o-mini
+ */
+async function generateWithOpenAI(params: GenerateResponseParams): Promise<{
+  response: string
+  tokensUsed: number
+  model: string
+  provider: AIProvider
+}> {
+  const openai = getOpenAIClient()
+  if (!openai) {
+    throw new Error('OpenAI client not configured')
+  }
+  
   const {
     reviewContent,
     reviewerName,
@@ -85,32 +175,97 @@ Nội dung đánh giá: "${reviewContent || 'Không có nội dung, chỉ có đ
 
 Hãy viết phản hồi phù hợp.`
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 300,
-    })
+  const completion = await openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 300,
+  })
 
-    return {
-      response: completion.choices[0]?.message?.content || '',
-      tokensUsed: completion.usage?.total_tokens || 0,
-      model: completion.model,
-    }
-  } catch (error) {
-    console.error('OpenAI API Error:', error)
-    throw new Error('Không thể tạo phản hồi AI. Vui lòng thử lại.')
+  return {
+    response: completion.choices[0]?.message?.content || '',
+    tokensUsed: completion.usage?.total_tokens || 0,
+    model: completion.model,
+    provider: 'openai',
   }
 }
 
 /**
- * Analyze sentiment of a review using OpenAI
+ * Generate response using Google Gemini
  */
-export async function analyzeSentiment(reviewContent: string): Promise<SentimentAnalysisResult> {
+async function generateWithGemini(params: GenerateResponseParams): Promise<{
+  response: string
+  tokensUsed: number
+  model: string
+  provider: AIProvider
+}> {
+  const {
+    reviewContent,
+    reviewerName,
+    rating,
+    sentiment,
+    businessName,
+    businessCategory,
+    tone,
+    language = 'vi',
+  } = params
+
+  const genAI = getGeminiClient()
+  if (!genAI) {
+    throw new Error('Gemini client not configured')
+  }
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+
+  const prompt = `Bạn là chuyên gia quản lý danh tiếng cho doanh nghiệp "${businessName}"${businessCategory ? ` (ngành ${businessCategory})` : ''}.
+
+Viết phản hồi cho đánh giá sau:
+- Khách hàng: ${reviewerName}
+- Đánh giá: ${rating}/5 sao
+- Cảm xúc: ${sentiment === 'POSITIVE' ? 'Tích cực' : sentiment === 'NEGATIVE' ? 'Tiêu cực' : 'Trung lập'}
+- Nội dung: "${reviewContent || 'Không có nội dung'}"
+
+Yêu cầu:
+- Giọng điệu: ${TONE_PROMPTS[tone]}
+- Ngôn ngữ: ${language === 'vi' ? 'Tiếng Việt' : 'English'}
+- Độ dài: 50-150 từ
+- Cảm ơn khách hàng, đề cập tên nếu có
+- Nếu tiêu cực: xin lỗi và đề xuất giải pháp
+- Kết thúc bằng lời chúc hoặc mời quay lại
+
+KHÔNG được:
+- Hứa hẹn cụ thể về giảm giá, bồi thường
+- Đề cập đến đối thủ cạnh tranh
+- Sử dụng ngôn ngữ tiêu cực hoặc phòng thủ`
+
+  const result = await model.generateContent(prompt)
+  const response = result.response
+  const text = response.text()
+
+  // Get token count if available
+  let tokensUsed = 0
+  if (result.response.usageMetadata) {
+    tokensUsed = (result.response.usageMetadata.promptTokenCount || 0) + 
+                 (result.response.usageMetadata.candidatesTokenCount || 0)
+  }
+
+  return {
+    response: text,
+    tokensUsed,
+    model: 'gemini-1.5-flash',
+    provider: 'gemini',
+  }
+}
+
+/**
+ * Analyze sentiment of a review - Uses OpenAI or Gemini
+ */
+export async function analyzeSentiment(
+  reviewContent: string,
+  preferredProvider: AIProvider = 'auto'
+): Promise<SentimentAnalysisResult> {
   if (!reviewContent || reviewContent.trim().length === 0) {
     return {
       sentiment: 'NEUTRAL',
@@ -118,6 +273,81 @@ export async function analyzeSentiment(reviewContent: string): Promise<Sentiment
       keywords: [],
       summary: 'Không có nội dung để phân tích',
     }
+  }
+
+  const useOpenAI = (preferredProvider === 'openai' || preferredProvider === 'auto') && checkOpenAIConfigured()
+  const useGemini = (preferredProvider === 'gemini' || preferredProvider === 'auto') && checkGeminiConfigured()
+  
+  if (!useOpenAI && !useGemini) {
+    // Fallback to rule-based sentiment if no AI available
+    return analyzeWithRules(reviewContent)
+  }
+
+  if (preferredProvider === 'gemini' && useGemini) {
+    return analyzeSentimentWithGemini(reviewContent)
+  }
+
+  if (useOpenAI) {
+    try {
+      return await analyzeSentimentWithOpenAI(reviewContent)
+    } catch (error) {
+      console.error('OpenAI sentiment failed, trying Gemini:', error)
+      if (useGemini) {
+        return analyzeSentimentWithGemini(reviewContent)
+      }
+      return analyzeWithRules(reviewContent)
+    }
+  }
+
+  return analyzeSentimentWithGemini(reviewContent)
+}
+
+/**
+ * Rule-based sentiment analysis fallback
+ */
+function analyzeWithRules(reviewContent: string): SentimentAnalysisResult {
+  const positiveWords = ['tốt', 'tuyệt', 'xuất sắc', 'hài lòng', 'thích', 'yêu', 'recommend', 'great', 'amazing', 'excellent', 'love', 'best']
+  const negativeWords = ['tệ', 'kém', 'tồi', 'thất vọng', 'chán', 'dở', 'bad', 'terrible', 'worst', 'hate', 'disappointing', 'awful']
+  
+  const content = reviewContent.toLowerCase()
+  let positiveCount = 0
+  let negativeCount = 0
+  const foundKeywords: string[] = []
+  
+  positiveWords.forEach(word => {
+    if (content.includes(word)) {
+      positiveCount++
+      foundKeywords.push(word)
+    }
+  })
+  
+  negativeWords.forEach(word => {
+    if (content.includes(word)) {
+      negativeCount++
+      foundKeywords.push(word)
+    }
+  })
+  
+  const score = (positiveCount - negativeCount) / Math.max(1, positiveCount + negativeCount)
+  let sentiment: Sentiment = 'NEUTRAL'
+  if (score > 0.2) sentiment = 'POSITIVE'
+  if (score < -0.2) sentiment = 'NEGATIVE'
+  
+  return {
+    sentiment,
+    score,
+    keywords: foundKeywords.slice(0, 5),
+    summary: `Phân tích bằng quy tắc: ${positiveCount} từ tích cực, ${negativeCount} từ tiêu cực`,
+  }
+}
+
+/**
+ * Analyze sentiment using OpenAI
+ */
+async function analyzeSentimentWithOpenAI(reviewContent: string): Promise<SentimentAnalysisResult> {
+  const openai = getOpenAIClient()
+  if (!openai) {
+    throw new Error('OpenAI not configured')
   }
 
   const prompt = `Phân tích cảm xúc của đánh giá sau đây và trả về JSON:
@@ -134,82 +364,64 @@ Trả về JSON với format:
 
 Chỉ trả về JSON, không có text khác.`
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 200,
-      response_format: { type: 'json_object' },
-    })
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.3,
+    max_tokens: 200,
+    response_format: { type: 'json_object' },
+  })
 
-    const result = JSON.parse(completion.choices[0]?.message?.content || '{}')
-    return {
-      sentiment: result.sentiment || 'NEUTRAL',
-      score: result.score || 0,
-      keywords: result.keywords || [],
-      summary: result.summary || '',
-    }
-  } catch (error) {
-    console.error('Sentiment Analysis Error:', error)
-    return {
-      sentiment: 'NEUTRAL',
-      score: 0,
-      keywords: [],
-      summary: 'Lỗi phân tích',
-    }
+  const result = JSON.parse(completion.choices[0]?.message?.content || '{}')
+  return {
+    sentiment: result.sentiment || 'NEUTRAL',
+    score: result.score || 0,
+    keywords: result.keywords || [],
+    summary: result.summary || '',
   }
 }
 
 /**
- * Alternative: Generate response using Google Gemini (backup LLM)
- * Cost: ~$0.075/1M input tokens, ~$0.30/1M output tokens for Gemini 1.5 Flash
+ * Analyze sentiment using Gemini
  */
-export async function generateReviewResponseGemini(params: GenerateResponseParams): Promise<{
-  response: string
-  tokensUsed: number
-  model: string
-}> {
-  const {
-    reviewContent,
-    reviewerName,
-    rating,
-    sentiment,
-    businessName,
-    businessCategory,
-    tone,
-  } = params
+async function analyzeSentimentWithGemini(reviewContent: string): Promise<SentimentAnalysisResult> {
+  const genAI = getGeminiClient()
+  if (!genAI) {
+    return analyzeWithRules(reviewContent)
+  }
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-1.5-flash',
+    generationConfig: { responseMimeType: 'application/json' }
+  })
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const prompt = `Phân tích cảm xúc của đánh giá sau đây và trả về JSON:
 
-  const prompt = `Bạn là chuyên gia quản lý danh tiếng cho doanh nghiệp "${businessName}"${businessCategory ? ` (ngành ${businessCategory})` : ''}.
+Đánh giá: "${reviewContent}"
 
-Viết phản hồi cho đánh giá sau:
-- Khách hàng: ${reviewerName}
-- Đánh giá: ${rating}/5 sao
-- Cảm xúc: ${sentiment === 'POSITIVE' ? 'Tích cực' : sentiment === 'NEGATIVE' ? 'Tiêu cực' : 'Trung lập'}
-- Nội dung: "${reviewContent || 'Không có nội dung'}"
+Trả về JSON với format:
+{
+  "sentiment": "POSITIVE" hoặc "NEUTRAL" hoặc "NEGATIVE",
+  "score": số từ -1 (rất tiêu cực) đến 1 (rất tích cực),
+  "keywords": ["từ khóa 1", "từ khóa 2", ...],
+  "summary": "tóm tắt ngắn gọn nội dung đánh giá"
+}
 
-Yêu cầu:
-- Giọng điệu: ${TONE_PROMPTS[tone]}
-- Độ dài: 50-150 từ tiếng Việt
-- Cảm ơn khách hàng, đề cập tên nếu có
-- Nếu tiêu cực: xin lỗi và đề xuất giải pháp
-- Kết thúc bằng lời chúc hoặc mời quay lại`
+Chỉ trả về JSON hợp lệ, không có text khác.`
 
   try {
     const result = await model.generateContent(prompt)
-    const response = result.response
-    const text = response.text()
-
+    const text = result.response.text()
+    const parsed = JSON.parse(text)
+    
     return {
-      response: text,
-      tokensUsed: 0, // Gemini doesn't return token count in same way
-      model: 'gemini-1.5-flash',
+      sentiment: parsed.sentiment || 'NEUTRAL',
+      score: parsed.score || 0,
+      keywords: parsed.keywords || [],
+      summary: parsed.summary || '',
     }
   } catch (error) {
-    console.error('Gemini API Error:', error)
-    throw new Error('Không thể tạo phản hồi AI với Gemini. Vui lòng thử lại.')
+    console.error('Gemini sentiment analysis error:', error)
+    return analyzeWithRules(reviewContent)
   }
 }
 

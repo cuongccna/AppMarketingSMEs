@@ -1,3 +1,6 @@
 export { useReviews, type Review } from './useReviews'
 export { useDashboard, type DashboardData } from './useDashboard'
 export { useBusinesses, type Business, type Location } from './useBusinesses'
+export { useProfile, useNotifications, useAIConfig, useTemplates } from './useSettings'
+export { useLocations, type LocationData, type LocationSentiment } from './useLocations'
+export { useAnalytics, type AnalyticsData } from './useAnalytics'

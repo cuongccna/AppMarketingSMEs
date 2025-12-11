@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import prisma from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
-import { generateReviewResponse, analyzeSentiment } from '@/lib/ai'
+import { generateReviewResponse, analyzeSentiment, getAvailableProviders, AIProvider } from '@/lib/ai'
 import { z } from 'zod'
 
 // Request validation schema
@@ -10,6 +10,7 @@ const generateResponseSchema = z.object({
   reviewId: z.string(),
   tone: z.enum(['FRIENDLY', 'PROFESSIONAL', 'EMPATHETIC', 'CONCISE', 'FORMAL']),
   customInstructions: z.string().optional(),
+  provider: z.enum(['openai', 'gemini', 'auto']).optional(),
 })
 
 /**
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { reviewId, tone, customInstructions } = generateResponseSchema.parse(body)
+    const { reviewId, tone, customInstructions, provider } = generateResponseSchema.parse(body)
 
     // Get the review with location and business info
     const review = await prisma.review.findUnique({
@@ -45,6 +46,23 @@ export async function POST(request: NextRequest) {
     // Verify user owns this business
     if (review.location.business.userId !== (session.user as any).id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Get user settings for preferred model
+    const userSettings = await prisma.userSettings.findUnique({
+      where: { userId: (session.user as any).id },
+    })
+    
+    // Determine AI provider to use (request param > user settings > auto)
+    const preferredProvider: AIProvider = provider || (userSettings as any)?.preferredModel || 'auto'
+    
+    // Check available providers
+    const availableProviders = getAvailableProviders()
+    if (!availableProviders.openai && !availableProviders.gemini) {
+      return NextResponse.json(
+        { error: 'Chưa cấu hình API key AI. Vui lòng thêm OPENAI_API_KEY hoặc GEMINI_API_KEY.' },
+        { status: 503 }
+      )
     }
 
     // Check user's subscription and usage limits
@@ -82,6 +100,7 @@ export async function POST(request: NextRequest) {
       businessName: review.location.business.name,
       businessCategory: review.location.business.category || undefined,
       tone: tone,
+      preferredProvider,
     })
 
     // Save the generated response
@@ -131,7 +150,9 @@ export async function POST(request: NextRequest) {
         tone: response.tone,
         tokensUsed: response.tokensUsed,
         model: response.modelUsed,
+        provider: result.provider,
       },
+      availableProviders,
     })
   } catch (error) {
     console.error('Generate response error:', error)

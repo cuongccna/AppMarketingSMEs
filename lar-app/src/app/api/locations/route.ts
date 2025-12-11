@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import prisma from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
+import { ReviewStatus } from '@prisma/client'
 
 const locationSchema = z.object({
   businessId: z.string(),
@@ -50,7 +51,46 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json({ locations })
+    // Enrich locations with review stats
+    const enrichedLocations = await Promise.all(
+      locations.map(async (location) => {
+        const reviewStats = await prisma.review.aggregate({
+          where: { locationId: location.id },
+          _avg: { rating: true },
+        })
+
+        const sentimentCounts = await prisma.review.groupBy({
+          by: ['sentiment'],
+          where: { locationId: location.id },
+          _count: true,
+        })
+
+        const pendingCount = await prisma.review.count({
+          where: {
+            locationId: location.id,
+            status: { in: [ReviewStatus.NEW, ReviewStatus.AI_DRAFT_READY, ReviewStatus.PENDING_RESPONSE] },
+          },
+        })
+
+        const lastReview = await prisma.review.findFirst({
+          where: { locationId: location.id },
+          orderBy: { publishedAt: 'desc' },
+          select: { publishedAt: true },
+        })
+
+        return {
+          ...location,
+          averageRating: reviewStats._avg.rating || 0,
+          pendingResponseCount: pendingCount,
+          positiveReviews: sentimentCounts.find(s => s.sentiment === 'POSITIVE')?._count || 0,
+          neutralReviews: sentimentCounts.find(s => s.sentiment === 'NEUTRAL')?._count || 0,
+          negativeReviews: sentimentCounts.find(s => s.sentiment === 'NEGATIVE')?._count || 0,
+          lastReviewDate: lastReview?.publishedAt,
+        }
+      })
+    )
+
+    return NextResponse.json({ locations: enrichedLocations })
   } catch (error) {
     console.error('Get locations error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

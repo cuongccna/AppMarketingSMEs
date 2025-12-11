@@ -36,11 +36,12 @@ interface UseBusinessesReturn {
   businesses: Business[]
   isLoading: boolean
   error: string | null
+  fetchBusinesses: () => Promise<void>
   refetch: () => Promise<void>
   createBusiness: (data: Partial<Business>) => Promise<Business | null>
   updateBusiness: (id: string, data: Partial<Business>) => Promise<boolean>
   deleteBusiness: (id: string) => Promise<boolean>
-  connectPlatform: (businessId: string, platform: 'google' | 'zalo', credentials: any) => Promise<boolean>
+  connectPlatform: (businessId: string, data: { platform: string; externalId: string; locationId: string }) => Promise<boolean>
 }
 
 export function useBusinesses(): UseBusinessesReturn {
@@ -138,14 +139,13 @@ export function useBusinesses(): UseBusinessesReturn {
 
   const connectPlatform = useCallback(async (
     businessId: string, 
-    platform: 'google' | 'zalo', 
-    credentials: any
+    data: { platform: string; externalId: string; locationId: string }
   ): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/businesses/${businessId}/connect`, {
+      const response = await fetch(`/api/businesses/${businessId}/connect-platform`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform, ...credentials }),
+        body: JSON.stringify(data),
       })
 
       if (!response.ok) {
@@ -165,6 +165,7 @@ export function useBusinesses(): UseBusinessesReturn {
     businesses,
     isLoading,
     error,
+    fetchBusinesses,
     refetch: fetchBusinesses,
     createBusiness,
     updateBusiness,
