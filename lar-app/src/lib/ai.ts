@@ -95,16 +95,21 @@ export async function generateReviewResponse(params: GenerateResponseParams): Pr
 }> {
   const { preferredProvider = 'auto' } = params
   
+  // Normalize provider name (accept both 'gemini' and 'gemini-1.5-flash', etc.)
+  const normalizedProvider = preferredProvider.startsWith('gemini') ? 'gemini' 
+    : preferredProvider.startsWith('gpt') || preferredProvider.startsWith('openai') ? 'openai'
+    : preferredProvider
+  
   // Determine which provider to use (dynamic check)
-  const useOpenAI = (preferredProvider === 'openai' || preferredProvider === 'auto') && checkOpenAIConfigured()
-  const useGemini = (preferredProvider === 'gemini' || preferredProvider === 'auto') && checkGeminiConfigured()
+  const useOpenAI = (normalizedProvider === 'openai' || normalizedProvider === 'auto') && checkOpenAIConfigured()
+  const useGemini = (normalizedProvider === 'gemini' || normalizedProvider === 'auto') && checkGeminiConfigured()
   
   if (!useOpenAI && !useGemini) {
     throw new Error('Chưa cấu hình API key cho AI. Vui lòng thêm OPENAI_API_KEY hoặc GEMINI_API_KEY.')
   }
   
-  // Try preferred provider first
-  if (preferredProvider === 'gemini' && useGemini) {
+  // Try Gemini first if preferred or if OpenAI not available
+  if (normalizedProvider === 'gemini' && useGemini) {
     return generateWithGemini(params)
   }
   
@@ -120,8 +125,12 @@ export async function generateReviewResponse(params: GenerateResponseParams): Pr
     }
   }
   
-  // Fallback to Gemini if OpenAI not available
-  return generateWithGemini(params)
+  // Fallback to Gemini if OpenAI not available (auto mode)
+  if (useGemini) {
+    return generateWithGemini(params)
+  }
+  
+  throw new Error('Không có AI provider khả dụng.')
 }
 
 /**
@@ -217,7 +226,8 @@ async function generateWithGemini(params: GenerateResponseParams): Promise<{
   if (!genAI) {
     throw new Error('Gemini client not configured')
   }
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+  const model = genAI.getGenerativeModel({ model: geminiModel })
 
   const prompt = `Bạn là chuyên gia quản lý danh tiếng cho doanh nghiệp "${businessName}"${businessCategory ? ` (ngành ${businessCategory})` : ''}.
 
@@ -254,7 +264,7 @@ KHÔNG được:
   return {
     response: text,
     tokensUsed,
-    model: 'gemini-1.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
     provider: 'gemini',
   }
 }
@@ -390,7 +400,7 @@ async function analyzeSentimentWithGemini(reviewContent: string): Promise<Sentim
     return analyzeWithRules(reviewContent)
   }
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-1.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
     generationConfig: { responseMimeType: 'application/json' }
   })
 

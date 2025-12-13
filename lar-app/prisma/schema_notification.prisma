@@ -1,0 +1,25 @@
+
+// ==================== Notifications ====================
+
+enum NotificationType {
+  SYSTEM
+  PROMOTION
+  ORDER
+  REVIEW
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  title       String
+  content     String           @db.Text
+  image       String?
+  type        NotificationType @default(SYSTEM)
+  customerId  String?          // null = global notification
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  customer    Customer?        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([createdAt])
+}

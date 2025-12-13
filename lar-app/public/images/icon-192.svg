@@ -1,0 +1,22 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="192" height="192" rx="40" fill="url(#icon192-gradient)"/>
+  
+  <!-- Star/Sparkle icon representing AI -->
+  <path d="M96 32L104 60L132 60L110 78L118 106L96 88L74 106L82 78L60 60L88 60L96 32Z" fill="white"/>
+  
+  <!-- Chat bubble representing reviews -->
+  <path d="M56 105C56 97 62 91 70 91H122C130 91 136 97 136 105V135C136 143 130 149 122 149H86L66 165V149H70C62 149 56 143 56 135V105Z" fill="white" opacity="0.9"/>
+  
+  <!-- Star rating dots -->
+  <circle cx="77" cy="120" r="6" fill="url(#icon192-gradient)"/>
+  <circle cx="96" cy="120" r="6" fill="url(#icon192-gradient)"/>
+  <circle cx="115" cy="120" r="6" fill="url(#icon192-gradient)"/>
+  
+  <defs>
+    <linearGradient id="icon192-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+  </defs>
+</svg>

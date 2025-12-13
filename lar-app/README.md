@@ -143,7 +143,8 @@ Mở [http://localhost:3000](http://localhost:3000) để xem ứng dụng.
 - [x] MVP: Phản hồi AI cho GBP
 - [x] Phân tích cảm xúc
 - [x] Dashboard analytics
-- [ ] Tích hợp Zalo OA đầy đủ
+- [x] Tích hợp Zalo OA (Backend & Webhook)
+- [ ] Frontend Zalo Mini App (Xem hướng dẫn: `ZALO_MINI_APP_GUIDE.md`)
 - [ ] Local SEO Audit
 - [ ] CRM Lite
 - [ ] Mobile app

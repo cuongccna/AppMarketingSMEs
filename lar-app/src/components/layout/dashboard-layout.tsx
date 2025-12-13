@@ -312,9 +312,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center gap-2 px-6 py-4 border-b">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
+            <img 
+              src="/images/logo.svg" 
+              alt="LAR Logo" 
+              className="h-10 w-10"
+            />
             <div>
               <h1 className="font-bold text-lg">LAR</h1>
               <p className="text-xs text-muted-foreground">AI Danh Tiếng Việt</p>

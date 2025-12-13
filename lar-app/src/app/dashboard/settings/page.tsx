@@ -32,6 +32,10 @@ import {
   Globe,
   Palette,
   AlertCircle,
+  Link2,
+  ExternalLink,
+  RefreshCw,
+  MessageCircle,
 } from 'lucide-react'
 import { useProfile, useNotifications, useAIConfig, useTemplates } from '@/hooks'
 
@@ -1073,6 +1077,310 @@ function ApiKeysTab() {
   )
 }
 
+// Integrations Tab - Zalo OA, Google Business Profile
+function IntegrationsTab() {
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [integrations, setIntegrations] = React.useState({
+    zaloOA: {
+      connected: false,
+      oaName: '',
+      oaId: '',
+      followers: 0,
+      lastSync: null as string | null,
+    },
+    googleBusiness: {
+      connected: false,
+      accountName: '',
+      locationsCount: 0,
+      lastSync: null as string | null,
+    },
+  })
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  // Check connection status on mount
+  React.useEffect(() => {
+    checkConnections()
+  }, [])
+
+  const checkConnections = async () => {
+    try {
+      const response = await fetch('/api/integrations/status')
+      if (response.ok) {
+        const data = await response.json()
+        setIntegrations(data)
+      }
+    } catch (error) {
+      console.error('Failed to check integrations:', error)
+    }
+  }
+
+  const handleConnectZalo = async () => {
+    setIsLoading(true)
+    try {
+      // Redirect to Zalo OAuth
+      const response = await fetch('/api/zalo/auth')
+      if (response.ok) {
+        const { authUrl } = await response.json()
+        window.location.href = authUrl
+      } else {
+        showToast('Không thể kết nối Zalo OA', 'error')
+      }
+    } catch (error) {
+      showToast('Có lỗi xảy ra', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDisconnectZalo = async () => {
+    if (!confirm('Bạn có chắc muốn ngắt kết nối Zalo OA?')) return
+    
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/zalo/disconnect', { method: 'POST' })
+      if (response.ok) {
+        setIntegrations(prev => ({
+          ...prev,
+          zaloOA: { connected: false, oaName: '', oaId: '', followers: 0, lastSync: null }
+        }))
+        showToast('Đã ngắt kết nối Zalo OA')
+      }
+    } catch (error) {
+      showToast('Có lỗi xảy ra', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleConnectGoogle = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/google/auth')
+      if (response.ok) {
+        const { authUrl } = await response.json()
+        window.location.href = authUrl
+      } else {
+        showToast('Không thể kết nối Google Business Profile', 'error')
+      }
+    } catch (error) {
+      showToast('Có lỗi xảy ra', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSyncZalo = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/zalo/sync', { method: 'POST' })
+      if (response.ok) {
+        showToast('Đã đồng bộ dữ liệu từ Zalo OA')
+        checkConnections()
+      }
+    } catch (error) {
+      showToast('Có lỗi xảy ra', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} />}
+
+      {/* Zalo OA Integration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-blue-600" />
+            Zalo Official Account
+          </CardTitle>
+          <CardDescription>
+            Kết nối Zalo OA để nhận thông báo và tương tác với khách hàng qua Zalo
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {integrations.zaloOA.connected ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                    <MessageCircle className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{integrations.zaloOA.oaName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      ID: {integrations.zaloOA.oaId} • {integrations.zaloOA.followers} followers
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-green-600">Đã kết nối</Badge>
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Đồng bộ lần cuối: {integrations.zaloOA.lastSync ? new Date(integrations.zaloOA.lastSync).toLocaleString('vi-VN') : 'Chưa đồng bộ'}</span>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleSyncZalo} disabled={isLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                  Đồng bộ
+                </Button>
+                <Button variant="outline" className="text-red-600" onClick={handleDisconnectZalo} disabled={isLoading}>
+                  Ngắt kết nối
+                </Button>
+              </div>
+
+              <div className="pt-4 border-t">
+                <h4 className="font-medium mb-2">Cấu hình thông báo</h4>
+                <div className="space-y-2 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded" defaultChecked />
+                    Gửi thông báo khi có review mới
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded" defaultChecked />
+                    Gửi cảnh báo khi có review tiêu cực (≤2 sao)
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded" />
+                    Gửi báo cáo tổng hợp hàng ngày
+                  </label>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="font-medium mb-2">Kết nối Zalo Official Account</h3>
+              <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                Kết nối Zalo OA để nhận thông báo ZNS khi có review mới và cho phép khách hàng tương tác qua Zalo Mini App
+              </p>
+              <Button onClick={handleConnectZalo} disabled={isLoading}>
+                <Link2 className="h-4 w-4 mr-2" />
+                {isLoading ? 'Đang kết nối...' : 'Kết nối Zalo OA'}
+              </Button>
+              <p className="text-xs text-muted-foreground mt-4">
+                <a 
+                  href="https://oa.zalo.me" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                >
+                  Tạo Zalo OA miễn phí <ExternalLink className="h-3 w-3" />
+                </a>
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Google Business Profile Integration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5 text-red-500" />
+            Google Business Profile
+          </CardTitle>
+          <CardDescription>
+            Kết nối Google Business Profile để đồng bộ và phản hồi reviews từ Google Maps
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {integrations.googleBusiness.connected ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                    <Globe className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{integrations.googleBusiness.accountName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {integrations.googleBusiness.locationsCount} địa điểm đã liên kết
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-green-600">Đã kết nối</Badge>
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Đồng bộ lần cuối: {integrations.googleBusiness.lastSync ? new Date(integrations.googleBusiness.lastSync).toLocaleString('vi-VN') : 'Chưa đồng bộ'}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Globe className="h-8 w-8 text-red-500" />
+              </div>
+              <h3 className="font-medium mb-2">Kết nối Google Business Profile</h3>
+              <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                Đồng bộ reviews từ Google Maps và phản hồi trực tiếp từ LAR App
+              </p>
+              <Button onClick={handleConnectGoogle} disabled={isLoading}>
+                <Link2 className="h-4 w-4 mr-2" />
+                {isLoading ? 'Đang kết nối...' : 'Kết nối Google Business'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Zalo Mini App Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-purple-500" />
+            Zalo Mini App
+          </CardTitle>
+          <CardDescription>
+            Cho phép khách hàng đánh giá và xem reviews qua Zalo Mini App
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shrink-0">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold mb-1">LAR Mini App</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Khách hàng có thể quét QR code hoặc tìm kiếm trên Zalo để:
+                </p>
+                <ul className="text-sm space-y-1 text-muted-foreground">
+                  <li>• Xem đánh giá của các địa điểm</li>
+                  <li>• Gửi đánh giá trực tiếp qua Zalo</li>
+                  <li>• Nhận phản hồi từ doanh nghiệp</li>
+                  <li>• Theo dõi lịch sử đánh giá</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {integrations.zaloOA.connected 
+                  ? 'Mini App sẵn sàng sử dụng'
+                  : 'Kết nối Zalo OA để kích hoạt Mini App'
+                }
+              </p>
+              <Badge variant="outline" className={integrations.zaloOA.connected ? 'border-green-500 text-green-600' : ''}>
+                {integrations.zaloOA.connected ? 'Hoạt động' : 'Chưa kích hoạt'}
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // Billing Tab
 function BillingTab() {
   const [isLoading, setIsLoading] = React.useState(false)
@@ -1261,6 +1569,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'profile', label: 'Hồ sơ', icon: <User className="h-4 w-4" /> },
     { id: 'notifications', label: 'Thông báo', icon: <Bell className="h-4 w-4" /> },
+    { id: 'integrations', label: 'Tích hợp', icon: <Link2 className="h-4 w-4" /> },
     { id: 'tone', label: 'Giọng điệu AI', icon: <Sparkles className="h-4 w-4" /> },
     { id: 'templates', label: 'Templates', icon: <MessageSquare className="h-4 w-4" /> },
     { id: 'api', label: 'API Keys', icon: <Key className="h-4 w-4" /> },
@@ -1282,6 +1591,7 @@ export default function SettingsPage() {
         <div className="pt-2">
           {activeTab === 'profile' && <ProfileTab />}
           {activeTab === 'notifications' && <NotificationsTab />}
+          {activeTab === 'integrations' && <IntegrationsTab />}
           {activeTab === 'tone' && <ToneSettingsTab />}
           {activeTab === 'templates' && <TemplatesTab />}
           {activeTab === 'api' && <ApiKeysTab />}

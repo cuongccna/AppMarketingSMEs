@@ -17,10 +17,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { locationId } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const { locationId } = body
 
+    // If no locationId, sync all locations for this user
     if (!locationId) {
-      return NextResponse.json({ error: 'Location ID is required' }, { status: 400 })
+      // Get all locations with GBP connection
+      const locations = await prisma.location.findMany({
+        where: {
+          business: {
+            userId: (session.user as any).id,
+          },
+          platformConnections: {
+            some: {
+              platform: 'GOOGLE_BUSINESS_PROFILE',
+              isConnected: true,
+            },
+          },
+        },
+        include: {
+          platformConnections: {
+            where: {
+              platform: 'GOOGLE_BUSINESS_PROFILE',
+              isConnected: true,
+            },
+          },
+        },
+      })
+
+      if (locations.length === 0) {
+        return NextResponse.json({
+          success: true,
+          message: 'Chưa kết nối Google Business Profile. Vui lòng kết nối địa điểm trước.',
+          synced: 0,
+          newReviews: 0,
+          updatedReviews: 0,
+        })
+      }
+
+      // For now, just return success - full sync would be done per location
+      return NextResponse.json({
+        success: true,
+        message: `Đã tìm thấy ${locations.length} địa điểm. Vui lòng đồng bộ từng địa điểm trong trang Địa Điểm.`,
+        locations: locations.length,
+        synced: 0,
+      })
     }
 
     // Get location with platform connection

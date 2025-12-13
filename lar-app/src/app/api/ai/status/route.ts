@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getAvailableProviders } from '@/lib/ai'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/ai/status
  * Check AI providers availability status

@@ -1,0 +1,23 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle - White for light mode -->
+  <circle cx="100" cy="100" r="90" fill="white" stroke="url(#light-gradient)" stroke-width="4"/>
+  
+  <!-- Star/Sparkle icon representing AI -->
+  <path d="M100 35L108 65L138 65L114 85L122 115L100 95L78 115L86 85L62 65L92 65L100 35Z" fill="url(#light-gradient)"/>
+  
+  <!-- Chat bubble representing reviews -->
+  <path d="M60 110C60 102 66 96 74 96H126C134 96 140 102 140 110V140C140 148 134 154 126 154H90L70 170V154H74C66 154 60 148 60 140V110Z" fill="url(#light-gradient)" opacity="0.9"/>
+  
+  <!-- Star rating dots -->
+  <circle cx="80" cy="125" r="6" fill="white"/>
+  <circle cx="100" cy="125" r="6" fill="white"/>
+  <circle cx="120" cy="125" r="6" fill="white"/>
+  
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="light-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+  </defs>
+</svg>

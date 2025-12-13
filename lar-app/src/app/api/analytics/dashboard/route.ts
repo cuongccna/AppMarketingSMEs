@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import prisma from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/analytics/dashboard
  * Get dashboard analytics for user's businesses

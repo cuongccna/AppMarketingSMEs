@@ -189,6 +189,8 @@ model Location {
   latitude   Float?
   longitude  Float?
   phone      String?
+  coverImage String?  // URL to cover image
+  pointsPerReview Int @default(10) // Points awarded per review
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -196,6 +198,7 @@ model Location {
   business            Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
   platformConnections PlatformConnection[]
   reviews             Review[]
+  rewards             Reward[]
   analytics           LocationAnalytics[]
 
   @@index([businessId])
@@ -206,11 +209,13 @@ model PlatformConnection {
   locationId     String
   platform       Platform
   externalId     String   // GBP Place ID or Zalo OA ID
+  platformName   String?  // Name of connected account (OA name, GBP business name)
   accessToken    String?  @db.Text
   refreshToken   String?  @db.Text
   tokenExpiresAt DateTime?
   isConnected    Boolean  @default(true)
   lastSyncAt     DateTime?
+  metadata       Json?    // Additional platform-specific data
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -244,6 +249,7 @@ model Review {
   externalId      String       // Review ID from platform
   authorName      String
   authorPhotoUrl  String?
+  zaloUserId      String?      // Zalo User ID for Mini App reviews
   rating          Int          // 1-5 stars
   content         String?      @db.Text
   sentiment       Sentiment    @default(NEUTRAL)
@@ -264,6 +270,7 @@ model Review {
   @@index([sentiment])
   @@index([status])
   @@index([publishedAt])
+  @@index([zaloUserId])
 }
 
 enum ResponseStatus {
@@ -362,4 +369,106 @@ model ReviewAuthenticityCheck {
 
   @@index([isSuspicious])
   @@index([suspicionScore])
+}
+
+// ==================== Loyalty System ====================
+
+model Customer {
+  id            String   @id @default(cuid())
+  zaloId        String   @unique
+  name          String?
+  phone         String?
+  avatar        String?
+  points        Int      @default(0)
+  level         String   @default("MEMBER") // MEMBER, SILVER, GOLD, PLATINUM
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transactions  PointTransaction[]
+  notifications Notification[]
+  redemptions   Redemption[]
+}
+
+model PointTransaction {
+  id          String   @id @default(cuid())
+  customerId  String
+  amount      Int      // Positive for earning, negative for spending
+  type        String   // REVIEW, PURCHASE, BONUS, REDEEM
+  description String?
+  createdAt   DateTime @default(now())
+
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+// ==================== Notifications ====================
+
+enum NotificationType {
+  SYSTEM
+  PROMOTION
+  ORDER
+  REVIEW
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  title       String
+  content     String           @db.Text
+  image       String?
+  type        NotificationType @default(SYSTEM)
+  customerId  String?          // null = global notification
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  customer    Customer?        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+// ==================== Loyalty & Rewards ====================
+
+model Reward {
+  id            String   @id @default(cuid())
+  locationId    String
+  name          String
+  description   String?
+  image         String?
+  pointsRequired Int
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  redemptions   Redemption[]
+
+  @@index([locationId])
+}
+
+enum RedemptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model Redemption {
+  id            String           @id @default(cuid())
+  code          String           @unique // Unique redemption code for QR
+  customerId    String
+  rewardId      String
+  pointsSpent   Int
+  status        RedemptionStatus @default(PENDING)
+  note          String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  reward        Reward   @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([rewardId])
+  @@index([status])
+  @@index([code])
 }

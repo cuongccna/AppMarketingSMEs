@@ -11,6 +11,8 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Chỉ dùng scope cơ bản để login
+      // Scope business.manage sẽ được request riêng khi kết nối GBP
     }),
     CredentialsProvider({
       name: 'credentials',
@@ -54,15 +56,28 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      // First time login - save user id
       if (user) {
         token.id = user.id
+        token.email = user.email
+        token.name = user.name
+        token.picture = user.image
+      }
+      // Save Google access token for Business Profile API
+      if (account?.provider === 'google') {
+        token.accessToken = account.access_token
+        token.refreshToken = account.refresh_token
+        token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : undefined
       }
       return token
     },
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = token.id
+      if (session.user && token) {
+        // Safely assign token.id as string
+        (session.user as any).id = token.id as string
+        // Pass access token to client for API calls
+        (session as any).accessToken = token.accessToken
       }
       return session
     },

@@ -1,0 +1,29 @@
+
+// ==================== Loyalty System ====================
+
+model Customer {
+  id            String   @id @default(cuid())
+  zaloId        String   @unique
+  name          String?
+  phone         String?
+  avatar        String?
+  points        Int      @default(0)
+  level         String   @default("MEMBER") // MEMBER, SILVER, GOLD, PLATINUM
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transactions  PointTransaction[]
+}
+
+model PointTransaction {
+  id          String   @id @default(cuid())
+  customerId  String
+  amount      Int      // Positive for earning, negative for spending
+  type        String   // REVIEW, PURCHASE, BONUS, REDEEM
+  description String?
+  createdAt   DateTime @default(now())
+
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}

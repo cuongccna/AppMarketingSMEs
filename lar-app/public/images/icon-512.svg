@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="url(#pwa-gradient)"/>
+  
+  <!-- Inner glow -->
+  <circle cx="256" cy="256" r="180" fill="url(#pwa-gradient2)" opacity="0.2"/>
+  
+  <!-- Star/Sparkle icon representing AI -->
+  <path d="M256 90L276 165L352 165L292 215L312 290L256 240L200 290L220 215L160 165L236 165L256 90Z" fill="white"/>
+  
+  <!-- Chat bubble representing reviews -->
+  <path d="M150 280C150 260 165 245 185 245H327C347 245 362 260 362 280V355C362 375 347 390 327 390H230L180 430V390H185C165 390 150 375 150 355V280Z" fill="white" opacity="0.9"/>
+  
+  <!-- Star rating dots -->
+  <circle cx="205" cy="320" r="15" fill="url(#pwa-gradient)"/>
+  <circle cx="256" cy="320" r="15" fill="url(#pwa-gradient)"/>
+  <circle cx="307" cy="320" r="15" fill="url(#pwa-gradient)"/>
+  
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="pwa-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="pwa-gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A5B4FC"/>
+      <stop offset="100%" style="stop-color:#C4B5FD"/>
+    </linearGradient>
+  </defs>
+</svg>
