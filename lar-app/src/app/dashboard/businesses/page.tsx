@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Plus,
   Building2,
   MapPin,
@@ -21,18 +29,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { useBusinesses } from '@/hooks'
-
-// Toast notification
-function Toast({ message, type = 'success' }: { message: string; type?: 'success' | 'error' }) {
-  return (
-    <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
-      type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-    }`}>
-      {type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-      {message}
-    </div>
-  )
-}
+import { useToast } from '@/components/ui/use-toast'
 
 interface AddBusinessModalProps {
   isOpen: boolean
@@ -52,14 +49,12 @@ function AddBusinessModal({ isOpen, onClose, onSubmit, isLoading }: AddBusinessM
     setCategory('')
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md p-6 m-4">
-        <h2 className="text-xl font-bold mb-4">Thêm Doanh Nghiệp Mới</h2>
-        
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Thêm Doanh Nghiệp Mới</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium">Tên doanh nghiệp</label>
@@ -80,17 +75,111 @@ function AddBusinessModal({ isOpen, onClose, onSubmit, isLoading }: AddBusinessM
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
               Hủy
             </Button>
-            <Button type="submit" className="flex-1" disabled={isLoading || !name}>
+            <Button type="submit" disabled={isLoading || !name}>
               {isLoading ? 'Đang tạo...' : 'Tạo doanh nghiệp'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface EditBusinessModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (data: { name: string; category: string }) => Promise<void>
+  isLoading: boolean
+  initialData: { name: string; category: string }
+}
+
+function EditBusinessModal({ isOpen, onClose, onSubmit, isLoading, initialData }: EditBusinessModalProps) {
+  const [name, setName] = React.useState(initialData.name)
+  const [category, setCategory] = React.useState(initialData.category)
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(initialData.name)
+      setCategory(initialData.category)
+    }
+  }, [isOpen, initialData])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await onSubmit({ name, category })
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Chỉnh Sửa Doanh Nghiệp</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Tên doanh nghiệp</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="VD: Quán Cơm Nhà Làm"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Danh mục</label>
+            <Input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="VD: Nhà hàng, Spa, Cửa hàng..."
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={isLoading || !name}>
+              {isLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface ConfirmDeleteModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: () => Promise<void>
+  isLoading: boolean
+}
+
+function ConfirmDeleteModal({ isOpen, onClose, onConfirm, isLoading }: ConfirmDeleteModalProps) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Xác nhận xóa doanh nghiệp</DialogTitle>
+          <DialogDescription>
+            Bạn có chắc muốn xóa doanh nghiệp này? Hành động này không thể hoàn tác và sẽ xóa tất cả dữ liệu liên quan (địa điểm, đánh giá, khách hàng).
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+            Hủy
+          </Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={isLoading}>
+            {isLoading ? 'Đang xóa...' : 'Xóa doanh nghiệp'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -152,18 +241,19 @@ function ConnectPlatformModal({
   const info = platformInfo[platform]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg p-6 m-4">
-        <div className="flex items-center gap-4 mb-6">
-          {info.icon}
-          <div>
-            <h2 className="text-xl font-bold">Kết nối {info.name}</h2>
-            <p className="text-sm text-muted-foreground">{businessName}</p>
-          </div>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {info.icon}
+            Kết nối {info.name}
+          </DialogTitle>
+          <DialogDescription>
+            {businessName}
+          </DialogDescription>
+        </DialogHeader>
 
-        <p className="text-sm text-gray-600 mb-6">{info.description}</p>
+        <p className="text-sm text-gray-600 mb-4">{info.description}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -196,13 +286,12 @@ function ConnectPlatformModal({
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
               Hủy
             </Button>
             <Button 
               type="submit" 
-              className="flex-1" 
               disabled={isLoading || !externalId || !selectedLocation}
             >
               {isLoading ? (
@@ -217,10 +306,10 @@ function ConnectPlatformModal({
                 </>
               )}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -231,14 +320,34 @@ export default function BusinessesPage() {
     error,
     fetchBusinesses, 
     createBusiness, 
+    updateBusiness,
     deleteBusiness, 
     connectPlatform 
   } = useBusinesses()
   
+  const { toast } = useToast()
   const [showAddModal, setShowAddModal] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
   const [syncingId, setSyncingId] = React.useState<string | null>(null)
-  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  
+  const [editModal, setEditModal] = React.useState<{
+    isOpen: boolean
+    businessId: string
+    initialData: { name: string; category: string }
+  }>({
+    isOpen: false,
+    businessId: '',
+    initialData: { name: '', category: '' }
+  })
+
+  const [deleteModal, setDeleteModal] = React.useState<{
+    isOpen: boolean
+    businessId: string
+  }>({
+    isOpen: false,
+    businessId: ''
+  })
+
   const [connectModal, setConnectModal] = React.useState<{
     isOpen: boolean
     businessId: string
@@ -257,20 +366,41 @@ export default function BusinessesPage() {
     fetchBusinesses()
   }, [fetchBusinesses])
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
-
   const handleAddBusiness = async (data: { name: string; category: string }) => {
     setIsSaving(true)
     const result = await createBusiness(data)
     setIsSaving(false)
     if (result) {
-      showToast('Đã tạo doanh nghiệp thành công!')
+      toast({
+        title: "Thành công",
+        description: "Đã tạo doanh nghiệp mới.",
+      })
       setShowAddModal(false)
     } else {
-      showToast(error || 'Không thể tạo doanh nghiệp', 'error')
+      toast({
+        title: "Lỗi",
+        description: error || "Không thể tạo doanh nghiệp.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditBusiness = async (data: { name: string; category: string }) => {
+    setIsSaving(true)
+    const success = await updateBusiness(editModal.businessId, data)
+    setIsSaving(false)
+    if (success) {
+      toast({
+        title: "Thành công",
+        description: "Đã cập nhật thông tin doanh nghiệp.",
+      })
+      setEditModal({ ...editModal, isOpen: false })
+    } else {
+      toast({
+        title: "Lỗi",
+        description: error || "Không thể cập nhật doanh nghiệp.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -280,17 +410,33 @@ export default function BusinessesPage() {
     await new Promise(resolve => setTimeout(resolve, 2000))
     await fetchBusinesses()
     setSyncingId(null)
-    showToast('Đã đồng bộ thành công!')
+    toast({
+      title: "Đồng bộ thành công",
+      description: "Dữ liệu đã được cập nhật mới nhất.",
+    })
   }
 
-  const handleDelete = async (businessId: string) => {
-    if (confirm('Bạn có chắc muốn xóa doanh nghiệp này? Hành động này không thể hoàn tác.')) {
-      const success = await deleteBusiness(businessId)
-      if (success) {
-        showToast('Đã xóa doanh nghiệp!')
-      } else {
-        showToast('Không thể xóa doanh nghiệp', 'error')
-      }
+  const handleDeleteClick = (businessId: string) => {
+    setDeleteModal({ isOpen: true, businessId })
+  }
+
+  const handleConfirmDelete = async () => {
+    setIsSaving(true)
+    const success = await deleteBusiness(deleteModal.businessId)
+    setIsSaving(false)
+    if (success) {
+      toast({
+        title: "Đã xóa",
+        description: "Doanh nghiệp đã được xóa thành công.",
+      })
+      setDeleteModal({ ...deleteModal, isOpen: false })
+    } else {
+      toast({
+        title: "Không thể xóa",
+        description: error || "Có lỗi xảy ra khi xóa doanh nghiệp.",
+        variant: "destructive",
+      })
+      setDeleteModal({ ...deleteModal, isOpen: false })
     }
   }
 
@@ -299,10 +445,17 @@ export default function BusinessesPage() {
     const result = await connectPlatform(connectModal.businessId, data)
     setIsSaving(false)
     if (result) {
-      showToast(`Đã kết nối ${data.platform === 'GOOGLE_BUSINESS_PROFILE' ? 'Google Business Profile' : 'Zalo OA'}!`)
+      toast({
+        title: "Kết nối thành công",
+        description: `Đã kết nối ${data.platform === 'GOOGLE_BUSINESS_PROFILE' ? 'Google Business Profile' : 'Zalo OA'}!`,
+      })
       setConnectModal({ ...connectModal, isOpen: false })
     } else {
-      showToast('Không thể kết nối platform', 'error')
+      toast({
+        title: "Lỗi kết nối",
+        description: "Không thể kết nối platform.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -378,8 +531,6 @@ export default function BusinessesPage() {
 
   return (
     <DashboardLayout>
-      {toast && <Toast message={toast.message} type={toast.type} />}
-      
       <div className="space-y-6">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -434,14 +585,22 @@ export default function BusinessesPage() {
                     >
                       <RefreshCw className={`h-4 w-4 ${syncingId === business.id ? 'animate-spin' : ''}`} />
                     </Button>
-                    <Button size="icon" variant="ghost">
+                    <Button 
+                      size="icon" 
+                      variant="ghost"
+                      onClick={() => setEditModal({
+                        isOpen: true,
+                        businessId: business.id,
+                        initialData: { name: business.name, category: business.category || '' }
+                      })}
+                    >
                       <Settings className="h-4 w-4" />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
                       className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDelete(business.id)}
+                      onClick={() => handleDeleteClick(business.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -571,6 +730,21 @@ export default function BusinessesPage() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={handleAddBusiness}
+        isLoading={isSaving}
+      />
+
+      <EditBusinessModal
+        isOpen={editModal.isOpen}
+        onClose={() => setEditModal({ ...editModal, isOpen: false })}
+        onSubmit={handleEditBusiness}
+        isLoading={isSaving}
+        initialData={editModal.initialData}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+        onConfirm={handleConfirmDelete}
         isLoading={isSaving}
       />
 
