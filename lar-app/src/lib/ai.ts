@@ -101,15 +101,24 @@ export async function generateReviewResponse(params: GenerateResponseParams): Pr
     : preferredProvider
   
   // Determine which provider to use (dynamic check)
-  const useOpenAI = (normalizedProvider === 'openai' || normalizedProvider === 'auto') && checkOpenAIConfigured()
-  const useGemini = (normalizedProvider === 'gemini' || normalizedProvider === 'auto') && checkGeminiConfigured()
+  let useOpenAI = (normalizedProvider === 'openai' || normalizedProvider === 'auto') && checkOpenAIConfigured()
+  let useGemini = (normalizedProvider === 'gemini' || normalizedProvider === 'auto') && checkGeminiConfigured()
   
+  // Smart fallback: If preferred provider is not configured, try the other one
+  if (normalizedProvider === 'openai' && !useOpenAI && checkGeminiConfigured()) {
+    console.log('OpenAI preferred but not configured, falling back to Gemini')
+    useGemini = true
+  } else if (normalizedProvider === 'gemini' && !useGemini && checkOpenAIConfigured()) {
+    console.log('Gemini preferred but not configured, falling back to OpenAI')
+    useOpenAI = true
+  }
+
   if (!useOpenAI && !useGemini) {
     throw new Error('Chưa cấu hình API key cho AI. Vui lòng thêm OPENAI_API_KEY hoặc GEMINI_API_KEY.')
   }
   
-  // Try Gemini first if preferred or if OpenAI not available
-  if (normalizedProvider === 'gemini' && useGemini) {
+  // Try Gemini first if it's the chosen one
+  if (useGemini && (normalizedProvider === 'gemini' || !useOpenAI)) {
     return generateWithGemini(params)
   }
   
