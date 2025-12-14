@@ -165,8 +165,7 @@ Yêu cầu phản hồi:
 - Giọng điệu: ${TONE_PROMPTS[tone]}
 - Ngôn ngữ: ${language === 'vi' ? 'Tiếng Việt' : 'English'}
 - Độ dài: 50-150 từ
-- Bắt đầu bằng lời cảm ơn khách hàng đã dành thời gian đánh giá
-- Đề cập tên khách hàng nếu có
+- Bắt đầu bằng lời chào với tên khách hàng: "${reviewerName}". Nếu tên là "User Name" hoặc "Khách hàng", hãy chào "Chào bạn".
 - Nếu đánh giá tích cực: cảm ơn và mời khách quay lại
 - Nếu đánh giá tiêu cực: xin lỗi, thể hiện sự thấu hiểu, đề xuất giải pháp
 - Nếu trung lập: cảm ơn góp ý và hứa cải thiện
@@ -241,7 +240,7 @@ Yêu cầu:
 - Giọng điệu: ${TONE_PROMPTS[tone]}
 - Ngôn ngữ: ${language === 'vi' ? 'Tiếng Việt' : 'English'}
 - Độ dài: 50-150 từ
-- Cảm ơn khách hàng, đề cập tên nếu có
+- Bắt đầu bằng lời chào với tên khách hàng: "${reviewerName}". Nếu tên là "User Name" hoặc "Khách hàng", hãy chào "Chào bạn".
 - Nếu tiêu cực: xin lỗi và đề xuất giải pháp
 - Kết thúc bằng lời chúc hoặc mời quay lại
 

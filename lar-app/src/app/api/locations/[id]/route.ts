@@ -11,6 +11,7 @@ const updateLocationSchema = z.object({
   city: z.string().optional(),
   district: z.string().optional(),
   phone: z.string().optional(),
+  pointsPerReview: z.number().int().min(0).optional(),
 })
 
 /**
@@ -165,6 +166,29 @@ export async function DELETE(
 
     if (location.business.userId !== (session.user as any).id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Check for existing reviews
+    const reviewCount = await prisma.review.count({
+      where: { locationId: params.id },
+    })
+
+    // Check for existing redemptions
+    const redemptionCount = await prisma.redemption.count({
+      where: {
+        reward: {
+          locationId: params.id,
+        },
+      },
+    })
+
+    if (reviewCount > 0 || redemptionCount > 0) {
+      return NextResponse.json(
+        {
+          error: `Không thể xóa địa điểm đã có phát sinh giao dịch (${reviewCount} đánh giá, ${redemptionCount} đổi quà). Vui lòng liên hệ admin để xử lý.`,
+        },
+        { status: 400 }
+      )
     }
 
     // Delete location (this will cascade delete reviews and responses)

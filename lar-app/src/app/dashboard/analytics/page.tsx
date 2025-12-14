@@ -47,63 +47,27 @@ import { useAnalytics, useLocations } from '@/hooks'
 // Fallback data for development/error states
 const fallbackDashboardData = {
   overview: {
-    totalReviews: 312,
-    averageRating: 4.4,
-    responseRate: 85,
-    pendingResponses: 18,
+    totalReviews: 0,
+    averageRating: 0,
+    responseRate: 0,
+    pendingResponses: 0,
   },
   sentiment: {
-    positive: 245,
-    neutral: 48,
-    negative: 19,
+    positive: 0,
+    neutral: 0,
+    negative: 0,
   },
   sentimentPercentage: {
-    positive: 78,
-    neutral: 15,
-    negative: 7,
+    positive: 0,
+    neutral: 0,
+    negative: 0,
   },
-  trend: [
-    { date: '2025-11-01', newReviews: 8, positiveCount: 6, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-11-08', newReviews: 12, positiveCount: 10, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-11-15', newReviews: 9, positiveCount: 7, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-11-22', newReviews: 15, positiveCount: 12, negativeCount: 2, neutralCount: 1 },
-    { date: '2025-11-29', newReviews: 11, positiveCount: 9, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-12-06', newReviews: 14, positiveCount: 11, negativeCount: 1, neutralCount: 2 },
-  ],
-  topKeywords: [
-    { keyword: 'ngon', count: 89 },
-    { keyword: 'phục vụ tốt', count: 72 },
-    { keyword: 'không gian đẹp', count: 58 },
-    { keyword: 'giá hợp lý', count: 45 },
-    { keyword: 'sạch sẽ', count: 41 },
-    { keyword: 'đợi lâu', count: 23 },
-    { keyword: 'thiếu món', count: 15 },
-  ],
+  trend: [],
+  topKeywords: [],
+  ratingDistribution: [],
+  locationStats: [],
+  monthlyData: [],
 }
-
-const mockLocationStats = [
-  { name: 'Chi nhánh Q1', reviews: 89, rating: 4.6, responses: 82, responseRate: 92 },
-  { name: 'Chi nhánh Q3', reviews: 45, rating: 4.3, responses: 38, responseRate: 84 },
-  { name: 'Chi nhánh Q7', reviews: 22, rating: 3.9, responses: 15, responseRate: 68 },
-  { name: 'Spa Bình Thạnh', reviews: 56, rating: 4.9, responses: 55, responseRate: 98 },
-]
-
-const mockMonthlyData = [
-  { month: 'Th7', reviews: 45, positive: 38, negative: 4, neutral: 3 },
-  { month: 'Th8', reviews: 52, positive: 44, negative: 5, neutral: 3 },
-  { month: 'Th9', reviews: 48, positive: 40, negative: 5, neutral: 3 },
-  { month: 'Th10', reviews: 61, positive: 52, negative: 6, neutral: 3 },
-  { month: 'Th11', reviews: 58, positive: 48, negative: 6, neutral: 4 },
-  { month: 'Th12', reviews: 48, positive: 41, negative: 4, neutral: 3 },
-]
-
-const mockRatingDistribution = [
-  { rating: '5 sao', count: 156, percentage: 50 },
-  { rating: '4 sao', count: 89, percentage: 29 },
-  { rating: '3 sao', count: 38, percentage: 12 },
-  { rating: '2 sao', count: 18, percentage: 6 },
-  { rating: '1 sao', count: 11, percentage: 3 },
-]
 
 const dateRangeOptions = [
   { value: '7d', label: '7 ngày qua' },
@@ -145,7 +109,7 @@ export default function AnalyticsPage() {
   const { locations } = useLocations()
 
   // Use API data or fallback
-  const dashboardData = apiData?.overview?.totalReviews > 0 ? apiData : fallbackDashboardData
+  const dashboardData = apiData || fallbackDashboardData
 
   const handleExport = () => {
     // Simulate export
@@ -157,11 +121,11 @@ export default function AnalyticsPage() {
   }
 
   // Calculate comparison stats
-  const stats = {
-    reviewsChange: 12, // % change from previous period
-    ratingChange: 0.2,
-    responseRateChange: 5,
-    positiveChange: 8,
+  const stats = dashboardData?.changes || {
+    reviewsChange: 0,
+    ratingChange: 0,
+    responseRateChange: 0,
+    positiveChange: 0,
   }
 
   return (
@@ -329,7 +293,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={mockMonthlyData}>
+                <AreaChart data={dashboardData?.monthlyData || []}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -375,7 +339,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockRatingDistribution.map((item) => (
+                {(dashboardData?.ratingDistribution || []).map((item) => (
                   <div key={item.rating} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{item.rating}</span>
@@ -417,7 +381,7 @@ export default function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockLocationStats.map((location, index) => (
+                  {(dashboardData?.locationStats || []).map((location, index) => (
                     <tr key={index} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">

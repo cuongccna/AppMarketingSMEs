@@ -1,18 +1,32 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 
 const inter = Inter({ subsets: ['latin', 'vietnamese'] })
 
+export const viewport: Viewport = {
+  themeColor: '#0f172a',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export const metadata: Metadata = {
   title: 'LAR - Local AI Responder | AI Danh Tiếng Việt',
   description: 'Tự động hóa quản lý và phản hồi đánh giá khách hàng trên Google Business Profile và Zalo OA cho SME Việt Nam',
   keywords: ['review management', 'AI response', 'Google Business Profile', 'Zalo OA', 'SME Vietnam', 'reputation management'],
   authors: [{ name: 'LAR Team' }],
+  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.svg',
-    apple: '/images/icon-192.svg',
+    apple: '/icons/icon-192x192.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'LAR',
   },
   openGraph: {
     title: 'LAR - Local AI Responder',

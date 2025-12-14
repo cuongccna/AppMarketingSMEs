@@ -20,98 +20,30 @@ import {
 import Link from 'next/link'
 import { useDashboard } from '@/hooks/useDashboard'
 import { useReviews } from '@/hooks/useReviews'
+import { useLocations } from '@/hooks/useLocations'
 
 // Fallback mock data for when API is unavailable
 const fallbackDashboardData = {
   overview: {
-    totalReviews: 147,
-    averageRating: 4.3,
-    responseRate: 78,
-    pendingResponses: 12,
+    totalReviews: 0,
+    averageRating: 0,
+    responseRate: 0,
+    pendingResponses: 0,
   },
   sentiment: {
-    positive: 98,
-    neutral: 32,
-    negative: 17,
+    positive: 0,
+    neutral: 0,
+    negative: 0,
   },
   sentimentPercentage: {
-    positive: 67,
-    neutral: 22,
-    negative: 11,
+    positive: 0,
+    neutral: 0,
+    negative: 0,
   },
-  trend: [
-    { date: '2025-12-02', newReviews: 5, positiveCount: 3, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-12-03', newReviews: 8, positiveCount: 6, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-12-04', newReviews: 3, positiveCount: 2, negativeCount: 0, neutralCount: 1 },
-    { date: '2025-12-05', newReviews: 6, positiveCount: 4, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-12-06', newReviews: 4, positiveCount: 3, negativeCount: 1, neutralCount: 0 },
-    { date: '2025-12-07', newReviews: 7, positiveCount: 5, negativeCount: 1, neutralCount: 1 },
-    { date: '2025-12-08', newReviews: 9, positiveCount: 7, negativeCount: 1, neutralCount: 1 },
-  ],
-  topKeywords: [
-    { keyword: 'ngon', count: 45 },
-    { keyword: 'phục vụ tốt', count: 38 },
-    { keyword: 'không gian đẹp', count: 32 },
-    { keyword: 'giá hợp lý', count: 28 },
-    { keyword: 'sạch sẽ', count: 24 },
-    { keyword: 'đợi lâu', count: 12 },
-    { keyword: 'thiếu món', count: 8 },
-  ],
+  trend: [],
+  topKeywords: [],
 }
 
-// Fallback reviews for when API fails
-const fallbackReviews = [
-  {
-    id: '1',
-    authorName: 'Nguyễn Văn An',
-    rating: 5,
-    content: 'Quán rất ngon, phục vụ nhiệt tình. Không gian thoáng mát, sạch sẽ. Chắc chắn sẽ quay lại!',
-    sentiment: 'POSITIVE' as const,
-    status: 'NEW',
-    publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    keywords: ['ngon', 'phục vụ', 'sạch sẽ'],
-    platform: 'GOOGLE_BUSINESS_PROFILE',
-    externalId: 'ext-1',
-    location: { id: 'loc-1', name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
-    responses: [],
-  },
-  {
-    id: '2',
-    authorName: 'Trần Thị Bình',
-    rating: 3,
-    content: 'Đồ ăn khá ổn nhưng phải đợi hơi lâu. Nhân viên có vẻ bận rộn.',
-    sentiment: 'NEUTRAL' as const,
-    status: 'AI_DRAFT_READY',
-    publishedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    keywords: ['đợi lâu', 'bận rộn'],
-    platform: 'GOOGLE_BUSINESS_PROFILE',
-    externalId: 'ext-2',
-    location: { id: 'loc-2', name: 'Chi nhánh Quận 3', address: '456 Võ Văn Tần, Q.3' },
-    responses: [
-      {
-        id: 'r1',
-        content: 'Cảm ơn bạn Bình đã ghé thăm và chia sẻ trải nghiệm! Chúng tôi rất tiếc vì bạn phải chờ đợi lâu.',
-        status: 'PENDING_APPROVAL',
-        isAiGenerated: true,
-        createdAt: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: '3',
-    authorName: 'Lê Minh Châu',
-    rating: 1,
-    content: 'Thất vọng! Món ăn nguội ngắt, phục vụ chậm chạp. Không đáng tiền.',
-    sentiment: 'NEGATIVE' as const,
-    status: 'NEW',
-    publishedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    keywords: ['thất vọng', 'nguội', 'chậm'],
-    platform: 'GOOGLE_BUSINESS_PROFILE',
-    externalId: 'ext-3',
-    location: { id: 'loc-1', name: 'Chi nhánh Quận 1', address: '123 Nguyễn Huệ, Q.1' },
-    responses: [],
-  },
-]
 
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -136,9 +68,12 @@ export default function DashboardPage() {
     isSyncing,
   } = useReviews({ limit: 6 })
 
+  // Fetch locations count
+  const { locations, isLoading: isLocationsLoading } = useLocations()
+
   // Use API data or fallback
   const displayData = dashboardData || fallbackDashboardData
-  const recentReviews = apiReviews.length > 0 ? apiReviews : fallbackReviews
+  const recentReviews = apiReviews
   const hasError = dashboardError || reviewsError
 
   const handleSync = async () => {
@@ -149,7 +84,7 @@ export default function DashboardPage() {
   // Calculate quick stats from data
   const negativeCount = displayData.sentiment?.negative || 0
   const pendingAI = recentReviews.filter(r => r.status === 'AI_DRAFT_READY').length
-  const locationsCount = 2 // This would come from useBusinesses in real implementation
+  const locationsCount = locations.length
 
   return (
     <DashboardLayout>
@@ -246,7 +181,11 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-green-800">Địa điểm đang theo dõi</p>
-                  <p className="text-2xl font-bold text-green-600">{locationsCount} địa điểm</p>
+                  {isLocationsLoading ? (
+                    <Skeleton className="h-8 w-24 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-green-600">{locationsCount} địa điểm</p>
+                  )}
                 </div>
                 <MapPin className="h-8 w-8 text-green-500" />
               </div>

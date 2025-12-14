@@ -20,12 +20,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (zaloId) {
-      const customer = await prisma.customer.findUnique({
-        where: { zaloId }
+      // Find all customer records for this Zalo ID
+      const customers = await prisma.customer.findMany({
+        where: { zaloId },
+        select: { id: true }
       })
       
-      if (customer) {
-        where.OR.push({ customerId: customer.id })
+      if (customers.length > 0) {
+        const customerIds = customers.map(c => c.id)
+        where.OR.push({ customerId: { in: customerIds } })
       }
     }
 
@@ -45,7 +48,8 @@ export async function GET(request: NextRequest) {
             title: 'Chào mừng bạn mới',
             content: 'Cảm ơn bạn đã sử dụng ứng dụng. Hãy khám phá các địa điểm thú vị nhé!',
             image: 'https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/banner-1.webp',
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            isRead: false
           }
         ]
       })

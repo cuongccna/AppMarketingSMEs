@@ -22,6 +22,8 @@ import {
   Zap,
   CheckCircle2,
   ExternalLink,
+  Users,
+  ScanLine,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +35,8 @@ const navigation = [
   { name: 'Đánh Giá', href: '/dashboard/reviews', icon: MessageSquare },
   { name: 'Doanh Nghiệp', href: '/dashboard/businesses', icon: Building2 },
   { name: 'Địa Điểm', href: '/dashboard/locations', icon: MapPin },
+  { name: 'Khách Hàng', href: '/dashboard/customers', icon: Users },
+  { name: 'Quét QR', href: '/dashboard/scan', icon: ScanLine },
   { name: 'Phân Tích', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Cài Đặt', href: '/dashboard/settings', icon: Settings },
 ]

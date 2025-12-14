@@ -73,14 +73,18 @@ export async function POST(request: NextRequest) {
     let pointsAwarded = 0
     try {
       // Find or create customer
-      let customer = await prisma.customer.findUnique({
-        where: { zaloId: zaloUserId },
+      let customer = await prisma.customer.findFirst({
+        where: { 
+          zaloId: zaloUserId,
+          businessId: location.businessId
+        },
       })
 
       if (!customer) {
         customer = await prisma.customer.create({
           data: {
             zaloId: zaloUserId,
+            businessId: location.businessId,
             name: zaloUserName,
             phone: zaloPhone,
           },
@@ -102,6 +106,11 @@ export async function POST(request: NextRequest) {
             description: `Đánh giá địa điểm ${location.name}`,
           },
         }),
+        // Link review to customer
+        prisma.review.update({
+          where: { id: review.id },
+          data: { customerId: customer.id }
+        })
       ])
     } catch (error) {
       console.error('Failed to award points:', error)

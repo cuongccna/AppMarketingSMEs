@@ -19,20 +19,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 1. Get Customer and Reward
-    const [customer, reward] = await Promise.all([
-      prisma.customer.findUnique({ where: { zaloId } }),
-      prisma.reward.findUnique({ where: { id: rewardId } })
-    ])
+    // 1. Get Reward first to know the business
+    const reward = await prisma.reward.findUnique({
+      where: { id: rewardId },
+      include: { location: true }
+    })
 
-    if (!customer) {
-      return NextResponse.json({ success: false, error: 'Customer not found' }, { status: 404 })
-    }
     if (!reward) {
       return NextResponse.json({ success: false, error: 'Reward not found' }, { status: 404 })
     }
     if (!reward.isActive) {
       return NextResponse.json({ success: false, error: 'Reward is no longer active' }, { status: 400 })
+    }
+
+    // 2. Get Customer for this business
+    const customer = await prisma.customer.findFirst({
+      where: { 
+        zaloId,
+        businessId: reward.location.businessId
+      }
+    })
+
+    if (!customer) {
+      return NextResponse.json({ success: false, error: 'Customer not found for this business' }, { status: 404 })
     }
 
     // 2. Check points

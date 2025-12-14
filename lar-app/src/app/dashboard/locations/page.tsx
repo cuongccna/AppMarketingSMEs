@@ -177,7 +177,7 @@ function LocationsPage() {
   }
 
   const handleDelete = async (locationId: string) => {
-    if (confirm('Bạn có chắc muốn xóa địa điểm này? Tất cả đánh giá liên quan cũng sẽ bị xóa.')) {
+    if (confirm('Bạn có chắc muốn xóa địa điểm này? Hành động này không thể hoàn tác.')) {
       const result = await deleteLocation(locationId)
       if (result.success) {
         showToast('Đã xóa địa điểm thành công!', 'success')
@@ -449,6 +449,12 @@ function LocationsPage() {
                         {/* Actions */}
                         <div className="flex items-center gap-2 lg:ml-4">
                           <Button variant="outline" size="sm" asChild>
+                            <a href={`/dashboard/locations/${location.id}/seo`}>
+                              <BarChart3 className="h-4 w-4 mr-1" />
+                              SEO
+                            </a>
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
                             <a href={`/dashboard/reviews?location=${location.id}`}>
                               <Eye className="h-4 w-4 mr-1" />
                               Xem
@@ -461,8 +467,10 @@ function LocationsPage() {
                               </a>
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon">
-                            <Settings className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" asChild>
+                            <a href={`/dashboard/locations/${location.id}/settings`}>
+                              <Settings className="h-4 w-4" />
+                            </a>
                           </Button>
                           <Button
                             variant="ghost"

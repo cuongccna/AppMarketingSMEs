@@ -35,6 +35,31 @@ export interface AnalyticsData {
     id: string
     name: string
   }[]
+  ratingDistribution?: {
+    rating: string
+    count: number
+    percentage: number
+  }[]
+  locationStats?: {
+    name: string
+    reviews: number
+    rating: number
+    responses: number
+    responseRate: number
+  }[]
+  monthlyData?: {
+    month: string
+    reviews: number
+    positive: number
+    negative: number
+    neutral: number
+  }[]
+  changes?: {
+    reviewsChange: number
+    ratingChange: number
+    responseRateChange: number
+    positiveChange: number
+  }
 }
 
 interface UseAnalyticsOptions {

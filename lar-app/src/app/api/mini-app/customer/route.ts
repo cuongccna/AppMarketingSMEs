@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const customer = await prisma.customer.findUnique({
+    const customer = await prisma.customer.findFirst({
       where: { zaloId },
+      orderBy: { updatedAt: 'desc' },
       include: {
         transactions: {
           take: 5,

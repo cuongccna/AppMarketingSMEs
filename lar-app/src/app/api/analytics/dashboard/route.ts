@@ -42,6 +42,38 @@ export async function GET(request: NextRequest) {
 
     const locationIds = locations.map(l => l.id)
 
+    // Calculate previous period
+    const previousStartDate = new Date(startDate)
+    previousStartDate.setDate(previousStartDate.getDate() - days)
+
+    // Get previous period aggregates
+    const prevReviewAggregates = await prisma.review.aggregate({
+      where: {
+        locationId: { in: locationIds },
+        publishedAt: { gte: previousStartDate, lt: startDate },
+      },
+      _count: true,
+      _avg: { rating: true },
+    })
+
+    const prevStatusStats = await prisma.review.groupBy({
+      by: ['status'],
+      where: {
+        locationId: { in: locationIds },
+        publishedAt: { gte: previousStartDate, lt: startDate },
+      },
+      _count: true,
+    })
+    
+    const prevReviewStats = await prisma.review.groupBy({
+      by: ['sentiment'],
+      where: {
+        locationId: { in: locationIds },
+        publishedAt: { gte: previousStartDate, lt: startDate },
+      },
+      _count: true,
+    })
+
     // Get review statistics
     const reviewStats = await prisma.review.groupBy({
       by: ['sentiment'],
@@ -136,6 +168,111 @@ export async function GET(request: NextRequest) {
       negative: reviewStats.find(s => s.sentiment === 'NEGATIVE')?._count || 0,
     }
 
+    // Calculate changes
+    const prevTotalReviews = prevReviewAggregates._count
+    const reviewsChange = prevTotalReviews > 0 
+      ? Math.round(((reviewAggregates._count - prevTotalReviews) / prevTotalReviews) * 100) 
+      : 0
+
+    const prevAvgRating = prevReviewAggregates._avg.rating || 0
+    const ratingChange = Math.round(((reviewAggregates._avg.rating || 0) - prevAvgRating) * 10) / 10
+
+    const prevRespondedCount = prevStatusStats.find(s => s.status === 'RESPONDED')?._count || 0
+    const prevResponseRate = prevTotalReviews > 0
+      ? Math.round((prevRespondedCount / prevTotalReviews) * 100)
+      : 0
+    const responseRateChange = responseRate - prevResponseRate
+
+    const prevPositiveCount = prevReviewStats.find(s => s.sentiment === 'POSITIVE')?._count || 0
+    const prevPositiveRate = prevTotalReviews > 0
+      ? Math.round((prevPositiveCount / prevTotalReviews) * 100)
+      : 0
+    const currentPositiveRate = reviewAggregates._count > 0
+      ? Math.round((sentimentData.positive / reviewAggregates._count) * 100)
+      : 0
+    const positiveChange = currentPositiveRate - prevPositiveRate
+
+    // 1. Rating Distribution
+    const ratingStats = await prisma.review.groupBy({
+      by: ['rating'],
+      where: {
+        locationId: { in: locationIds },
+        publishedAt: { gte: startDate, lte: endDate },
+      },
+      _count: true,
+    })
+
+    const ratingDistribution = [5, 4, 3, 2, 1].map(rating => {
+      const count = ratingStats.find(s => s.rating === rating)?._count || 0
+      return {
+        rating: `${rating} sao`,
+        count,
+        percentage: reviewAggregates._count > 0 ? Math.round((count / reviewAggregates._count) * 100) : 0
+      }
+    })
+
+    // 2. Location Stats
+    const locationStats = await Promise.all(locations.map(async (loc) => {
+      const locReviews = await prisma.review.aggregate({
+        where: {
+          locationId: loc.id,
+          publishedAt: { gte: startDate, lte: endDate },
+        },
+        _count: true,
+        _avg: { rating: true },
+      })
+      
+      const locResponded = await prisma.review.count({
+        where: {
+          locationId: loc.id,
+          publishedAt: { gte: startDate, lte: endDate },
+          status: 'RESPONDED'
+        }
+      })
+
+      return {
+        name: loc.name,
+        reviews: locReviews._count,
+        rating: Math.round((locReviews._avg.rating || 0) * 10) / 10,
+        responses: locResponded,
+        responseRate: locReviews._count > 0 ? Math.round((locResponded / locReviews._count) * 100) : 0
+      }
+    }))
+
+    // 3. Monthly Data (Last 6 months)
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5)
+    sixMonthsAgo.setDate(1) // Start of month
+
+    const monthlyAnalytics = await prisma.locationAnalytics.findMany({
+      where: {
+        locationId: { in: locationIds },
+        date: { gte: sixMonthsAgo },
+      },
+    })
+
+    const monthlyDataMap: Record<string, any> = {}
+    // Initialize last 6 months
+    for (let i = 0; i < 6; i++) {
+      const d = new Date()
+      d.setMonth(d.getMonth() - i)
+      const key = `${d.getMonth() + 1}/${d.getFullYear()}`
+      const label = `Th${d.getMonth() + 1}`
+      monthlyDataMap[key] = { month: label, reviews: 0, positive: 0, negative: 0, neutral: 0, sortKey: d.getTime() }
+    }
+
+    monthlyAnalytics.forEach(a => {
+      const key = `${a.date.getMonth() + 1}/${a.date.getFullYear()}`
+      if (monthlyDataMap[key]) {
+        monthlyDataMap[key].reviews += a.newReviews
+        monthlyDataMap[key].positive += a.positiveCount
+        monthlyDataMap[key].negative += a.negativeCount
+        monthlyDataMap[key].neutral += a.neutralCount
+      }
+    })
+
+    const monthlyData = Object.values(monthlyDataMap).sort((a, b) => a.sortKey - b.sortKey)
+
     return NextResponse.json({
       overview: {
         totalReviews: reviewAggregates._count,
@@ -159,6 +296,15 @@ export async function GET(request: NextRequest) {
       topKeywords,
       locations: locations.length,
       dateRange: { start: startDate, end: endDate },
+      ratingDistribution,
+      locationStats,
+      monthlyData,
+      changes: {
+        reviewsChange,
+        ratingChange,
+        responseRateChange,
+        positiveChange,
+      }
     })
   } catch (error) {
     console.error('Dashboard analytics error:', error)

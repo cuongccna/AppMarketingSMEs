@@ -175,6 +175,7 @@ model Business {
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   locations Location[]
+  customers Customer[]
 
   @@index([userId])
 }
@@ -250,6 +251,7 @@ model Review {
   authorName      String
   authorPhotoUrl  String?
   zaloUserId      String?      // Zalo User ID for Mini App reviews
+  customerId      String?      // Link to CRM Customer
   rating          Int          // 1-5 stars
   content         String?      @db.Text
   sentiment       Sentiment    @default(NEUTRAL)
@@ -262,6 +264,7 @@ model Review {
   updatedAt       DateTime     @updatedAt
 
   location  Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  customer  Customer?  @relation(fields: [customerId], references: [id])
   responses Response[]
 
   @@unique([platform, externalId])
@@ -271,6 +274,7 @@ model Review {
   @@index([status])
   @@index([publishedAt])
   @@index([zaloUserId])
+  @@index([customerId])
 }
 
 enum ResponseStatus {
@@ -375,18 +379,29 @@ model ReviewAuthenticityCheck {
 
 model Customer {
   id            String   @id @default(cuid())
-  zaloId        String   @unique
+  businessId    String?
+  zaloId        String?
   name          String?
   phone         String?
+  email         String?
   avatar        String?
   points        Int      @default(0)
   level         String   @default("MEMBER") // MEMBER, SILVER, GOLD, PLATINUM
+  notes         String?  @db.Text
+  tags          String[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  business      Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
   transactions  PointTransaction[]
   notifications Notification[]
   redemptions   Redemption[]
+  reviews       Review[]
+
+  @@unique([businessId, zaloId])
+  @@index([businessId])
+  @@index([phone])
+  @@index([email])
 }
 
 model PointTransaction {

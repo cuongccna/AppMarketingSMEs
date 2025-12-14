@@ -59,10 +59,33 @@ export async function POST(request: NextRequest) {
     })
 
     // Update review status
-    await prisma.review.update({
+    const updatedReview = await prisma.review.update({
       where: { id: response.reviewId },
       data: { status: 'PENDING_RESPONSE' },
+      include: { location: true }
     })
+
+    // Create Notification for Customer (if Zalo User)
+    if (updatedReview.zaloUserId) {
+      const customer = await prisma.customer.findFirst({
+        where: { 
+          zaloId: updatedReview.zaloUserId,
+          businessId: updatedReview.location.businessId
+        }
+      })
+
+      if (customer) {
+        await prisma.notification.create({
+          data: {
+            customerId: customer.id,
+            title: `Phản hồi từ ${updatedReview.location.name}`,
+            content: `Cửa hàng đã phản hồi đánh giá của bạn:\n\n"${updatedResponse.content}"`,
+            type: 'REVIEW',
+            image: updatedReview.location.coverImage
+          }
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,
