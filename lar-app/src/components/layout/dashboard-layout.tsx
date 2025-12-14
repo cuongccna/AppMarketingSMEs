@@ -41,45 +41,15 @@ const navigation = [
   { name: 'Cài Đặt', href: '/dashboard/settings', icon: Settings },
 ]
 
-// Mock notifications data
-const mockNotifications = [
-  {
-    id: '1',
-    type: 'negative_review',
-    title: 'Đánh giá tiêu cực mới',
-    message: 'Lê Minh Châu đã đánh giá 1 sao - Chi nhánh Q1',
-    time: '5 phút trước',
-    read: false,
-    link: '/dashboard/reviews?id=3',
-  },
-  {
-    id: '2',
-    type: 'ai_ready',
-    title: 'AI đã soạn phản hồi',
-    message: '3 phản hồi mới đang chờ duyệt',
-    time: '15 phút trước',
-    read: false,
-    link: '/dashboard/reviews?status=AI_DRAFT_READY',
-  },
-  {
-    id: '3',
-    type: 'new_review',
-    title: 'Đánh giá mới',
-    message: 'Nguyễn Văn An đã đánh giá 5 sao',
-    time: '1 giờ trước',
-    read: true,
-    link: '/dashboard/reviews?id=1',
-  },
-  {
-    id: '4',
-    type: 'sync_complete',
-    title: 'Đồng bộ hoàn tất',
-    message: 'Đã cập nhật 12 đánh giá mới từ Google',
-    time: '2 giờ trước',
-    read: true,
-    link: '/dashboard/reviews',
-  },
-]
+type Notification = {
+  id: string
+  type: string
+  title: string
+  message: string
+  time: string
+  read: boolean
+  link: string
+}
 
 // Notification Dropdown Component
 function NotificationDropdown({ 
@@ -90,7 +60,29 @@ function NotificationDropdown({
   onClose: () => void 
 }) {
   const dropdownRef = React.useRef<HTMLDivElement>(null)
-  const [notifications, setNotifications] = React.useState(mockNotifications)
+  const [notifications, setNotifications] = React.useState<Notification[]>([])
+  const [loading, setLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch('/api/notifications')
+        if (res.ok) {
+          const data = await res.json()
+          setNotifications(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (isOpen) {
+      fetchNotifications()
+    }
+  }, [isOpen])
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
