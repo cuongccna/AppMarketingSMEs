@@ -14,6 +14,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://larai.vn'),
   title: 'LAR - Local AI Responder | AI Danh Tiếng Việt',
   description: 'Tự động hóa quản lý và phản hồi đánh giá khách hàng trên Google Business Profile và Zalo OA cho SME Việt Nam',
   keywords: ['review management', 'AI response', 'Google Business Profile', 'Zalo OA', 'SME Vietnam', 'reputation management'],

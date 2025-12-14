@@ -53,9 +53,6 @@ export async function POST(request: NextRequest) {
       where: { userId: (session.user as any).id },
     })
     
-    // Determine AI provider to use (request param > user settings > auto)
-    const preferredProvider: AIProvider = provider || (userSettings as any)?.preferredModel || 'auto'
-    
     // Check available providers
     const availableProviders = getAvailableProviders()
     if (!availableProviders.openai && !availableProviders.gemini) {
@@ -63,6 +60,18 @@ export async function POST(request: NextRequest) {
         { error: 'Chưa cấu hình API key AI. Vui lòng thêm OPENAI_API_KEY hoặc GEMINI_API_KEY.' },
         { status: 503 }
       )
+    }
+
+    // Determine AI provider to use (request param > user settings > auto)
+    let preferredProvider: AIProvider = provider || (userSettings as any)?.preferredModel || 'auto'
+
+    // Fallback logic: If preferred provider is not available, use the other one
+    if (preferredProvider === 'openai' && !availableProviders.openai && availableProviders.gemini) {
+      console.log('OpenAI preferred but not configured, falling back to Gemini')
+      preferredProvider = 'gemini'
+    } else if (preferredProvider === 'gemini' && !availableProviders.gemini && availableProviders.openai) {
+      console.log('Gemini preferred but not configured, falling back to OpenAI')
+      preferredProvider = 'openai'
     }
 
     // Check user's subscription and usage limits
