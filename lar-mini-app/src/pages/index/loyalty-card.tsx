@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text } from "zmp-ui";
-import { getUserInfo } from "zmp-sdk/apis";
+import { useRecoilValue } from "recoil";
+import { userState } from "../../state";
 import { getCustomerInfo, CustomerInfo } from "services/api";
 
-export const LoyaltyCard = () => {
-  const [userInfo, setUserInfo] = useState<any>(null);
+interface LoyaltyCardProps {
+  refreshKey?: number;
+}
+
+export const LoyaltyCard: React.FC<LoyaltyCardProps> = ({ refreshKey }) => {
+  const userInfo = useRecoilValue(userState);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     points: 0,
     level: "MEMBER",
@@ -13,21 +18,20 @@ export const LoyaltyCard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const { userInfo } = await getUserInfo({});
-        setUserInfo(userInfo);
-        
-        if (userInfo.id) {
+      if (userInfo.id) {
+        try {
+          console.log("Fetching customer info for:", userInfo.id);
           const data = await getCustomerInfo(userInfo.id);
+          console.log("Customer info received:", data);
           setCustomerInfo(data);
+        } catch (error) {
+          console.error("Failed to fetch customer info", error);
         }
-      } catch (error) {
-        console.error(error);
       }
     };
     
     fetchData();
-  }, []);
+  }, [userInfo.id, refreshKey]);
 
   return (
     <Box

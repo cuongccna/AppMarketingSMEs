@@ -36,6 +36,7 @@ export interface Notification {
   content: string;
   image?: string;
   createdAt: string;
+  isRead: boolean;
 }
 
 export const getLocations = async (): Promise<Location[]> => {
@@ -75,7 +76,8 @@ export const submitReview = async (data: ReviewData) => {
 
 export const getCustomerInfo = async (zaloId: string): Promise<CustomerInfo> => {
   try {
-    const response = await fetch(`${CONFIG.API_BASE_URL}/customer?zaloId=${zaloId}`);
+    // Add timestamp to prevent caching
+    const response = await fetch(`${CONFIG.API_BASE_URL}/customer?zaloId=${zaloId}&t=${Date.now()}`);
     if (!response.ok) {
       throw new Error("Failed to fetch customer info");
     }
@@ -161,6 +163,30 @@ export const getUserReviews = async (zaloId: string) => {
   }
 };
 
+export interface Redemption {
+  id: string;
+  code: string;
+  status: string;
+  pointsSpent: number;
+  createdAt: string;
+  reward: {
+    name: string;
+    image: string;
+  };
+}
+
+export const getRedemptionHistory = async (zaloId: string): Promise<Redemption[]> => {
+  try {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/rewards/history?zaloId=${zaloId}`);
+    if (!response.ok) throw new Error("Failed to fetch redemption history");
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error("Error fetching redemption history:", error);
+    return [];
+  }
+};
+
 export const getNotifications = async (zaloId?: string): Promise<Notification[]> => {
   try {
     const url = zaloId 
@@ -176,3 +202,30 @@ export const getNotifications = async (zaloId?: string): Promise<Notification[]>
     return [];
   }
 };
+
+export const markNotificationAsRead = async (id: string) => {
+  try {
+    await fetch(`${CONFIG.API_BASE_URL}/notifications/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+  }
+};
+
+
+
+export const getMyRedemptions = async (zaloId: string): Promise<Redemption[]> => {
+  try {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/rewards/history?zaloId=${zaloId}`);
+    if (!response.ok) throw new Error("Failed to fetch redemptions");
+    const data = await response.json();
+    return data.data;
+  } catch (error) {
+    console.error("Error fetching redemptions:", error);
+    return [];
+  }
+};
+

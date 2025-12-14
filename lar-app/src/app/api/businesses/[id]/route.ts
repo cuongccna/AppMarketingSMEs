@@ -127,10 +127,41 @@ export async function DELETE(
         id,
         userId: (session.user as any).id,
       },
+      include: {
+        customers: {
+          include: {
+            _count: {
+              select: {
+                transactions: true,
+                redemptions: true,
+              }
+            }
+          }
+        },
+        locations: {
+          include: {
+            _count: {
+              select: {
+                reviews: true
+              }
+            }
+          }
+        }
+      }
     })
 
     if (!existing) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
+
+    // Check for transactions or reviews
+    const hasTransactions = existing.customers.some(c => c._count.transactions > 0 || c._count.redemptions > 0)
+    const hasReviews = existing.locations.some(l => l._count.reviews > 0)
+
+    if (hasTransactions || hasReviews) {
+      return NextResponse.json({ 
+        error: 'Không thể xóa doanh nghiệp đã có giao dịch (đánh giá, tích điểm, đổi quà).' 
+      }, { status: 400 })
     }
 
     // Cascade delete will handle locations, connections, reviews

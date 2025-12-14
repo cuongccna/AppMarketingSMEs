@@ -1,10 +1,11 @@
-import React, { FC } from "react";
+import React, { FC, Suspense } from "react";
 import { Route, Routes } from "react-router";
-import { Box } from "zmp-ui";
+import { Box, Spinner } from "zmp-ui";
 import { Navigation } from "./navigation";
 import HomePage from "pages/index";
 import NotificationPage from "pages/notification";
 import ProfilePage from "pages/profile";
+import RewardsPage from "pages/rewards";
 import { getSystemInfo } from "zmp-sdk";
 import { ScrollRestoration } from "./scroll-restoration";
 import { useHandlePayment } from "hooks";
@@ -28,11 +29,20 @@ export const Layout: FC = () => {
     <Box flex flexDirection="column" className="h-screen">
       <ScrollRestoration />
       <Box className="flex-1 flex flex-col overflow-hidden">
-        <Routes>
-          <Route path="/" element={<HomePage />}></Route>
-          <Route path="/notification" element={<NotificationPage />}></Route>
-          <Route path="/profile" element={<ProfilePage />}></Route>
-        </Routes>
+        <Suspense
+          fallback={
+            <Box className="flex-1 flex justify-center items-center">
+              <Spinner visible />
+            </Box>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<HomePage />}></Route>
+            <Route path="/rewards" element={<RewardsPage />}></Route>
+            <Route path="/notification" element={<NotificationPage />}></Route>
+            <Route path="/profile" element={<ProfilePage />}></Route>
+          </Routes>
+        </Suspense>
       </Box>
       <Navigation />
     </Box>

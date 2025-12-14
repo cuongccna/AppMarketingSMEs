@@ -6,9 +6,10 @@ import { submitReview } from "services/api";
 interface ReviewSectionProps {
   locationId: string;
   locationName: string;
+  onReviewSuccess?: () => void;
 }
 
-export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locationName }) => {
+export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locationName, onReviewSuccess }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -44,6 +45,13 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
       
       setRating(0);
       setComment("");
+      
+      // Wait a bit for backend to process points
+      setTimeout(() => {
+        if (onReviewSuccess) {
+          onReviewSuccess();
+        }
+      }, 1000);
     } catch (error) {
       console.error(error);
       openSnackbar({

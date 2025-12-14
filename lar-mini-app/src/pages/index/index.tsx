@@ -10,6 +10,7 @@ import { getLocations, Location } from "services/api";
 const HomePage: React.FunctionComponent = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -31,13 +32,17 @@ const HomePage: React.FunctionComponent = () => {
     <Page className="relative flex-1 flex flex-col bg-white">
       <Welcome />
       <Box className="flex-1 overflow-auto">
-        <LoyaltyCard />
+        <LoyaltyCard refreshKey={refreshKey} />
         <Banner />
         <Divider />
         {loading ? (
            <Box className="p-4 text-center"><Text>Đang tải thông tin...</Text></Box>
         ) : selectedLocation ? (
-           <ReviewSection locationId={selectedLocation.id} locationName={selectedLocation.name} />
+           <ReviewSection 
+             locationId={selectedLocation.id} 
+             locationName={selectedLocation.name} 
+             onReviewSuccess={() => setRefreshKey(k => k + 1)}
+           />
         ) : (
            <Box className="p-4 text-center"><Text>Không tìm thấy địa điểm nào.</Text></Box>
         )}

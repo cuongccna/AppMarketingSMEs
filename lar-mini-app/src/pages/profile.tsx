@@ -4,7 +4,7 @@ import subscriptionDecor from "static/subscription-decor.svg";
 import { ListRenderer } from "components/list-renderer";
 import { useToBeImplemented } from "hooks";
 import { getUserInfo, openPhone } from "zmp-sdk/apis";
-import { getCustomerInfo, CustomerInfo, getUserReviews, getRewards, redeemReward, checkRedemptionStatus, Reward } from "services/api";
+import { getCustomerInfo, CustomerInfo, getUserReviews, getRewards, redeemReward, checkRedemptionStatus, Reward, getRedemptionHistory, Redemption } from "services/api";
 import { Button, useSnackbar, Modal } from "zmp-ui";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -190,7 +190,7 @@ const ReviewHistorySheet: FC<{ visible: boolean; onClose: () => void; zaloId: st
                 </Box>
               </Box>
               <Text size="small" className="text-gray-600 mb-1">{review.content}</Text>
-              <Text size="xxSmall" className="text-gray-400">{new Date(review.publishedAt).toLocaleDateString()}</Text>
+              <Text size="xxSmall" className="text-gray-400">{new Date(review.date).toLocaleDateString()}</Text>
             </Box>
           ))
         )}
@@ -223,10 +223,80 @@ const PointHistorySheet: FC<{ visible: boolean; onClose: () => void; transaction
   );
 };
 
+const RedemptionHistorySheet: FC<{ visible: boolean; onClose: () => void; zaloId: string }> = ({ visible, onClose, zaloId }) => {
+  const [history, setHistory] = useState<Redemption[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (visible && zaloId) {
+      setLoading(true);
+      getRedemptionHistory(zaloId)
+        .then(setHistory)
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [visible, zaloId]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'COMPLETED': return 'text-green-500';
+      case 'PENDING': return 'text-yellow-500';
+      case 'CANCELLED': return 'text-red-500';
+      default: return 'text-gray-500';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'COMPLETED': return 'Thành công';
+      case 'PENDING': return 'Đang chờ';
+      case 'CANCELLED': return 'Đã hủy';
+      default: return status;
+    }
+  };
+
+  return (
+    <Sheet visible={visible} onClose={onClose} autoHeight title="Lịch sử đổi quà">
+      <Box className="p-4 max-h-[60vh] overflow-y-auto">
+        {loading ? (
+          <Text className="text-center text-gray-500">Đang tải...</Text>
+        ) : history.length === 0 ? (
+          <Text className="text-center text-gray-500">Chưa có lịch sử đổi quà</Text>
+        ) : (
+          history.map((item) => (
+            <Box key={item.id} className="mb-4 p-3 bg-gray-50 rounded-lg flex gap-3">
+              <div className="w-16 h-16 bg-white rounded-md overflow-hidden flex-shrink-0">
+                 {item.reward.image ? (
+                    <img src={item.reward.image} alt={item.reward.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Icon icon="zi-gift" className="text-gray-400 text-2xl m-auto h-full flex items-center justify-center" />
+                  )}
+              </div>
+              <Box className="flex-1">
+                <Text className="font-bold line-clamp-1">{item.reward.name}</Text>
+                <Box className="flex justify-between items-center mt-1">
+                  <Text size="small" className="text-gray-500">-{item.pointsSpent} điểm</Text>
+                  <Text size="small" className={`font-medium ${getStatusColor(item.status)}`}>
+                    {getStatusText(item.status)}
+                  </Text>
+                </Box>
+                <Text size="xxSmall" className="text-gray-400 mt-1">
+                  {new Date(item.createdAt).toLocaleDateString()} - Mã: {item.code}
+                </Text>
+              </Box>
+            </Box>
+          ))
+        )}
+      </Box>
+    </Sheet>
+  );
+};
+
 const Personal: FC<{ userInfo: any; customerInfo: CustomerInfo; onRefresh: () => void }> = ({ userInfo, customerInfo, onRefresh }) => {
   const [historyVisible, setHistoryVisible] = useState(false);
   const [infoVisible, setInfoVisible] = useState(false);
   const [rewardsVisible, setRewardsVisible] = useState(false);
+  const [redemptionHistoryVisible, setRedemptionHistoryVisible] = useState(false);
 
   return (
     <Box className="m-4">
@@ -269,6 +339,18 @@ const Personal: FC<{ userInfo: any; customerInfo: CustomerInfo; onRefresh: () =>
             ),
             onClick: () => setRewardsVisible(true)
           },
+          {
+            left: <Icon icon="zi-clock-1" />,
+            right: (
+              <Box flex>
+                <Text.Header className="flex-1 items-center font-normal">
+                  Lịch sử đổi quà
+                </Text.Header>
+                <Icon icon="zi-chevron-right" />
+              </Box>
+            ),
+            onClick: () => setRedemptionHistoryVisible(true)
+          },
         ]}
         renderLeft={(item) => item.left}
         renderRight={(item) => item.right}
@@ -290,6 +372,11 @@ const Personal: FC<{ userInfo: any; customerInfo: CustomerInfo; onRefresh: () =>
         userInfo={userInfo}
         customerPoints={customerInfo.points}
         onRedeemSuccess={onRefresh}
+      />
+      <RedemptionHistorySheet
+        visible={redemptionHistoryVisible}
+        onClose={() => setRedemptionHistoryVisible(false)}
+        zaloId={userInfo?.id}
       />
     </Box>
   );

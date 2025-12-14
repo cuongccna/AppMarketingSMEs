@@ -1,0 +1,22 @@
+### 1. Lấy danh sách quà (Để lấy ID quà)
+GET http://localhost:4000/api/mini-app/rewards
+
+### 2. Yêu cầu đổi quà (User App)
+# Thay zaloId bằng ID thật của user trong DB
+# Thay rewardId bằng ID của món quà lấy từ bước 1
+POST http://localhost:4000/api/mini-app/rewards/redeem
+Content-Type: application/json
+
+{
+  "zaloId": "84912345678", 
+  "rewardId": "REPLACE_WITH_REWARD_ID"
+}
+
+### 3. Xác nhận đổi quà (Staff App / Postman)
+# Thay "CODE_FROM_STEP_2" bằng mã code trả về từ bước 2 (hoặc hiển thị trên QR)
+POST http://localhost:4000/api/mini-app/rewards/confirm
+Content-Type: application/json
+
+{
+  "code": "CODE_FROM_STEP_2"
+}
