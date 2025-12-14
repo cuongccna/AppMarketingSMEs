@@ -17,6 +17,7 @@ export default function ScanPage() {
   const [isScanning, setIsScanning] = useState(false)
   const { toast } = useToast()
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const isProcessing = useRef(false)
 
   useEffect(() => {
     // Cleanup on unmount
@@ -43,6 +44,7 @@ export default function ScanPage() {
 
         const scanner = new Html5Qrcode("reader")
         scannerRef.current = scanner
+        isProcessing.current = false
         
         await scanner.start(
             { facingMode: "environment" },
@@ -80,11 +82,12 @@ export default function ScanPage() {
   }
 
   const onScanSuccess = (decodedText: string) => {
-    if (decodedText !== scanResult) {
-      setScanResult(decodedText)
-      handleConfirm(decodedText)
-      stopScanning()
-    }
+    if (isProcessing.current) return
+    
+    isProcessing.current = true
+    setScanResult(decodedText)
+    stopScanning()
+    handleConfirm(decodedText)
   }
 
   const handleConfirm = async (code: string) => {
@@ -129,6 +132,7 @@ export default function ScanPage() {
     setScanResult(null)
     setResultData(null)
     setManualCode('')
+    isProcessing.current = false
     // Wait for UI to render "reader" div then start
     setTimeout(() => {
         startScanning()
