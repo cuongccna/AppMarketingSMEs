@@ -20106,3 +20106,7 @@ lar-app/.next/static/webpack/webpack.f85e4e70ed5fecad.hot-update.js
 lar-app/.next/static/webpack/app/layout.25e7dc8268353421.hot-update.js
 lar-app/.next/static/webpack/app/layout.bc009f9d6fa9a2d0.hot-update.js
 lar-app/.next/*
+
+lar-app/public/sw.js
+lar-app/public/workbox-*.js
+lar-app/deploy/.env.production
