@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SubscriptionModal } from '@/components/subscription/subscription-modal'
+import { useSubscription } from '@/hooks/use-subscription'
 import { cn } from '@/lib/utils'
 
 const navigation = [
@@ -283,6 +284,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const { subscription, usage, planDetails, isLoading: isSubscriptionLoading } = useSubscription()
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
   const [notificationOpen, setNotificationOpen] = React.useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = React.useState(false)
@@ -352,11 +354,34 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <CreditCard className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium">Gói Free</span>
+                <span className="text-sm font-medium">
+                  {isSubscriptionLoading ? 'Đang tải...' : `Gói ${planDetails?.name || 'Free'}`}
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                8/10 phản hồi AI còn lại
-              </p>
+              {!isSubscriptionLoading && usage && (
+                <div className="space-y-2 mb-3">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Phản hồi AI</span>
+                      <span className="font-medium">
+                        {usage.aiResponsesLimit === -1 
+                          ? 'Không giới hạn' 
+                          : `${usage.aiResponsesUsed}/${usage.aiResponsesLimit}`}
+                      </span>
+                    </div>
+                    {usage.aiResponsesLimit !== -1 && (
+                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                          style={{ 
+                            width: `${Math.min((usage.aiResponsesUsed / usage.aiResponsesLimit) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <Button 
                 size="sm" 
                 className="w-full" 
@@ -457,7 +482,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <SubscriptionModal 
         isOpen={subscriptionModalOpen}
         onClose={() => setSubscriptionModalOpen(false)}
-        currentPlan="FREE"
+        currentPlan={subscription?.plan || 'FREE'}
       />
     </div>
   )
