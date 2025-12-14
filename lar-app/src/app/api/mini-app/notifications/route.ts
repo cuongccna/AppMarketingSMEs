@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
             id: 'welcome',
             title: 'Chào mừng bạn mới',
             content: 'Cảm ơn bạn đã sử dụng ứng dụng. Hãy khám phá các địa điểm thú vị nhé!',
-            image: 'https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/banner-1.webp',
+            image: 'https://larai.vn/images/banner-lar.png',
             createdAt: new Date().toISOString(),
             isRead: false
           }
