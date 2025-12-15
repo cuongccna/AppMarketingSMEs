@@ -222,6 +222,13 @@ export async function POST(request: NextRequest) {
                 modelUsed: responseResult.model,
               },
             })
+
+            // Update review status to indicate it's pending response
+            await prisma.review.update({
+              where: { id: currentReviewId },
+              data: { status: 'PENDING_RESPONSE' }
+            })
+
             console.log(`Scheduled auto-reply for review ${currentReviewId}`)
           }
         } catch (err) {

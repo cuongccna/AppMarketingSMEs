@@ -278,7 +278,8 @@ export async function GET(request: NextRequest) {
         totalReviews: reviewAggregates._count,
         averageRating: Math.round((reviewAggregates._avg.rating || 0) * 10) / 10,
         responseRate,
-        pendingResponses: statusStats.find(s => s.status === 'NEW')?._count || 0,
+        pendingResponses: (statusStats.find(s => s.status === 'AI_DRAFT_READY')?._count || 0) + 
+                         (statusStats.find(s => s.status === 'PENDING_RESPONSE')?._count || 0),
       },
       sentiment: sentimentData,
       sentimentPercentage: {
