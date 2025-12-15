@@ -118,7 +118,7 @@ const Subscription: FC<{ userInfo: any; customerInfo: CustomerInfo }> = ({ userI
   return (
     <Box className="m-4">
       <Box
-        className="bg-green text-white rounded-xl p-4 space-y-2"
+        className="bg-primary text-white rounded-xl p-4 space-y-2"
         style={{
           backgroundImage: `url(${subscriptionDecor})`,
           backgroundPosition: "right 8px center",
@@ -145,11 +145,11 @@ const UserInfoSheet: FC<{ visible: boolean; onClose: () => void; userInfo: any; 
           </Box>
           <Box className="flex justify-between">
             <Text className="text-gray-500">Hạng thành viên:</Text>
-            <Text className="font-bold text-green-600">{customerInfo.level}</Text>
+            <Text className="font-bold text-primary">{customerInfo.level}</Text>
           </Box>
           <Box className="flex justify-between">
             <Text className="text-gray-500">Điểm tích lũy:</Text>
-            <Text className="font-bold text-green-600">{customerInfo.points}</Text>
+            <Text className="font-bold text-primary">{customerInfo.points}</Text>
           </Box>
         </Box>
       </Box>
@@ -212,7 +212,7 @@ const PointHistorySheet: FC<{ visible: boolean; onClose: () => void; transaction
                 <Text className="font-medium">{tx.description || "Giao dịch"}</Text>
                 <Text size="xxSmall" className="text-gray-500">{new Date(tx.createdAt).toLocaleDateString()}</Text>
               </Box>
-              <Text className={`font-bold ${tx.amount > 0 ? "text-green-500" : "text-red-500"}`}>
+              <Text className={`font-bold ${tx.amount > 0 ? "text-primary" : "text-red-500"}`}>
                 {tx.amount > 0 ? "+" : ""}{tx.amount}
               </Text>
             </Box>
@@ -239,7 +239,7 @@ const RedemptionHistorySheet: FC<{ visible: boolean; onClose: () => void; zaloId
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return 'text-green-500';
+      case 'COMPLETED': return 'text-primary';
       case 'PENDING': return 'text-yellow-500';
       case 'CANCELLED': return 'text-red-500';
       default: return 'text-gray-500';
@@ -328,7 +328,7 @@ const Personal: FC<{ userInfo: any; customerInfo: CustomerInfo; onRefresh: () =>
             onClick: () => setHistoryVisible(true)
           },
           {
-            left: <Icon icon="zi-gift-solid" className="text-green-600" />,
+            left: <Icon icon="zi-star-solid" className="text-primary" />,
             right: (
               <Box flex>
                 <Text.Header className="flex-1 items-center font-normal">
@@ -391,8 +391,8 @@ const ContactSheet: FC<{ visible: boolean; onClose: () => void }> = ({ visible, 
     <Sheet visible={visible} onClose={onClose} autoHeight title="Liên hệ và góp ý">
       <Box className="p-4 space-y-4">
         <Box className="flex items-center space-x-3" onClick={handleCallHotline}>
-          <Box className="bg-green-100 p-2 rounded-full">
-            <Icon icon="zi-call" className="text-green-600" />
+          <Box className="bg-primary bg-opacity-10 p-2 rounded-full">
+            <Icon icon="zi-call" className="text-primary" />
           </Box>
           <Box>
             <Text className="font-medium">Hotline</Text>

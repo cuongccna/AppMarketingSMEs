@@ -64,12 +64,12 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
   };
 
   return (
-    <Box className="m-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-      <Text.Title size="large" className="mb-4 font-bold text-center">
+    <Box className="mx-4 mb-4 mt-2 p-3 bg-white rounded-xl shadow-sm border border-gray-100">
+      <Text.Title size="normal" className="mb-2 font-bold text-center">
         Đánh giá {locationName}
       </Text.Title>
       
-      <Box className="flex justify-center mb-6 gap-2">
+      <Box className="flex justify-center mb-4 gap-2">
         {[1, 2, 3, 4, 5].map((star) => (
           <div 
             key={star} 
@@ -79,7 +79,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
             <Icon
               icon={star <= rating ? "zi-star-solid" : "zi-star"}
               className={star <= rating ? "text-yellow-400" : "text-gray-300"}
-              style={{ fontSize: 32, color: star <= rating ? '#FADB14' : '#E0E0E0' }}
+              style={{ fontSize: 28, color: star <= rating ? '#FADB14' : '#E0E0E0' }}
             />
           </div>
         ))}
@@ -92,7 +92,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
           onChange={(e) => setComment(e.target.value)}
           showCount
           maxLength={200}
-          rows={4}
+          rows={3}
         />
       </Box>
 

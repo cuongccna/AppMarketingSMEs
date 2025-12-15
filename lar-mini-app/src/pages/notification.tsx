@@ -4,6 +4,7 @@ import { Box, Header, Page, Text, Sheet, Icon } from "zmp-ui";
 import { Divider } from "components/divider";
 import { getNotifications, Notification, markNotificationAsRead } from "services/api";
 import { getUserInfo } from "zmp-sdk/apis";
+import logo from "static/logo.png";
 
 const NotificationDetailSheet: FC<{ visible: boolean; onClose: () => void; notification: Notification | null }> = ({ visible, onClose, notification }) => {
   if (!notification) return null;
@@ -79,7 +80,7 @@ const NotificationList: FC<{ setUnreadCount: (count: number) => void }> = ({ set
           <Box className="relative">
             <img 
               className="w-12 h-12 rounded-full object-cover" 
-              src={item.image || "https://larai.vn/images/banner-lar.png"} 
+              src={item.image || logo} 
             />
             {!item.isRead && (
               <Box className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />

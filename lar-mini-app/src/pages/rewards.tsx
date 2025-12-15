@@ -72,9 +72,9 @@ const RewardsPage = () => {
       <Tabs id="rewards-tab">
         <Tabs.Tab key="list" label="Danh sách quà">
           <Box p={4}>
-            <Box className="mb-4 p-4 bg-blue-50 rounded-lg flex justify-between items-center">
-              <Text className="font-bold text-blue-600">Điểm của bạn:</Text>
-              <Text className="font-bold text-xl text-blue-600">{customerPoints}</Text>
+            <Box className="mb-4 p-4 bg-primary rounded-lg flex justify-between items-center">
+              <Text className="font-bold text-white">Điểm của bạn:</Text>
+              <Text className="font-bold text-xl text-white">{customerPoints}</Text>
             </Box>
             {rewards.map((reward) => (
               <Box key={reward.id} className="flex gap-4 mb-4 border p-4 rounded-lg">
