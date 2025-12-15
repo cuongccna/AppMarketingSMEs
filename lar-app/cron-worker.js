@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Cấu hình URL của ứng dụng (mặc định là localhost:3000)
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+const APP_URL = process.env.APP_URL || 'http://localhost:3001';
 const CRON_ENDPOINT = `${APP_URL}/api/cron/process-scheduled-replies`;
 
 console.log(`Starting cron worker for ${CRON_ENDPOINT}`);
