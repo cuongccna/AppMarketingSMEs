@@ -57,6 +57,16 @@ export async function GET(request: NextRequest) {
             rating: true,
           },
         },
+        platformConnections: {
+          where: {
+            platform: 'GOOGLE_BUSINESS_PROFILE',
+            isConnected: true,
+          },
+          select: {
+            externalId: true, // This is the Place ID
+          },
+          take: 1,
+        },
       },
       take: 50,
     })
@@ -68,6 +78,8 @@ export async function GET(request: NextRequest) {
         ? loc.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount 
         : 0
       
+      const googlePlaceId = loc.platformConnections[0]?.externalId
+
       return {
         id: loc.id,
         name: loc.name,
@@ -75,6 +87,7 @@ export async function GET(request: NextRequest) {
         phone: loc.phone,
         city: loc.city,
         district: loc.district,
+        googlePlaceId,
         rating: Math.round(avgRating * 10) / 10,
         reviewCount,
         businessName: loc.business.name,

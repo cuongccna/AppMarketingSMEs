@@ -7,10 +7,18 @@ import { submitReview } from "services/api";
 interface ReviewSectionProps {
   locationId: string;
   locationName: string;
+  locationAddress?: string;
+  googlePlaceId?: string;
   onReviewSuccess?: () => void;
 }
 
-export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locationName, onReviewSuccess }) => {
+export const ReviewSection: React.FC<ReviewSectionProps> = ({ 
+  locationId, 
+  locationName, 
+  locationAddress,
+  googlePlaceId,
+  onReviewSuccess 
+}) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -27,9 +35,18 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
 
     // Ưu tiên chuyển hướng ngay lập tức nếu 5 sao
     if (rating === 5) {
-      openWebview({
-        url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`,
-      });
+      let mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`;
+      
+      if (googlePlaceId) {
+        // Nếu có Place ID, dùng query_place_id để chính xác tuyệt đối
+        // Lưu ý: query vẫn bắt buộc, nên để tên địa điểm
+        mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}&query_place_id=${googlePlaceId}`;
+      } else if (locationAddress) {
+        // Fallback: Kết hợp Tên + Địa chỉ để tìm kiếm chính xác hơn
+        mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName + ", " + locationAddress)}`;
+      }
+
+      openWebview({ url: mapUrl });
     }
 
     setSubmitting(true);

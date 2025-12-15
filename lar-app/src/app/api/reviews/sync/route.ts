@@ -179,6 +179,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Auto-Reply Logic for 5-star positive reviews (Check for both new and existing reviews)
+      console.log(`Checking auto-reply for review ${currentReviewId}: Rating=${reviewData.rating}, Sentiment=${currentSentiment}, HasReply=${reviewData.hasReply}, AutoReplySetting=${userSettings?.autoReplyFiveStar}`)
+      
       if (
         userSettings?.autoReplyFiveStar &&
         reviewData.rating === 5 &&
@@ -192,6 +194,7 @@ export async function POST(request: NextRequest) {
           })
 
           if (!existingResponse) {
+            console.log(`Generating auto-reply for review ${currentReviewId}...`)
             const responseResult = await generateReviewResponse({
               reviewContent: reviewData.content || '',
               reviewerName: reviewData.authorName,

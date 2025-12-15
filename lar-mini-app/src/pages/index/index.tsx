@@ -40,7 +40,9 @@ const HomePage: React.FunctionComponent = () => {
         ) : selectedLocation ? (
            <ReviewSection 
              locationId={selectedLocation.id} 
-             locationName={selectedLocation.name} 
+             locationName={selectedLocation.name}
+             locationAddress={selectedLocation.address}
+             googlePlaceId={selectedLocation.googlePlaceId}
              onReviewSuccess={() => setRefreshKey(k => k + 1)}
            />
         ) : (
