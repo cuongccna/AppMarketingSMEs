@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import prisma from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { GoogleBusinessProfileClient, transformGBPReview } from '@/lib/google-business'
-import { analyzeSentiment } from '@/lib/ai'
+import { analyzeSentiment, generateReviewResponse } from '@/lib/ai'
 
 /**
  * POST /api/reviews/sync
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
         },
       },
       include: {
+        business: true,
         platformConnections: {
           where: {
             platform: 'GOOGLE_BUSINESS_PROFILE',
@@ -110,6 +111,11 @@ export async function POST(request: NextRequest) {
       pageToken = result.nextPageToken
     } while (pageToken && allReviews.length < 200) // Limit for cost control
 
+    // Get user settings for auto-reply
+    const userSettings = await prisma.userSettings.findUnique({
+      where: { userId: (session.user as any).id },
+    })
+
     // Process and save reviews
     let newReviewsCount = 0
     let updatedReviewsCount = 0
@@ -144,7 +150,7 @@ export async function POST(request: NextRequest) {
         const sentimentResult = await analyzeSentiment(reviewData.content || '')
 
         // Create new review
-        await prisma.review.create({
+        const newReview = await prisma.review.create({
           data: {
             locationId: location.id,
             platform: 'GOOGLE_BUSINESS_PROFILE',
@@ -161,6 +167,47 @@ export async function POST(request: NextRequest) {
           },
         })
         newReviewsCount++
+
+        // Auto-Reply Logic for 5-star positive reviews
+        if (
+          userSettings?.autoReplyFiveStar &&
+          reviewData.rating === 5 &&
+          sentimentResult.sentiment === 'POSITIVE' &&
+          !reviewData.hasReply
+        ) {
+          try {
+            const responseResult = await generateReviewResponse({
+              reviewContent: reviewData.content || '',
+              reviewerName: reviewData.authorName,
+              rating: reviewData.rating,
+              sentiment: sentimentResult.sentiment,
+              businessName: location.business.name,
+              tone: (userSettings.defaultTone as any) || 'PROFESSIONAL',
+              customInstructions: userSettings.customInstructions || undefined,
+              preferredProvider: (userSettings.preferredModel as any) || 'auto',
+            })
+
+            // Schedule for 15 minutes later
+            const scheduledAt = new Date()
+            scheduledAt.setMinutes(scheduledAt.getMinutes() + 15)
+
+            await prisma.response.create({
+              data: {
+                reviewId: newReview.id,
+                content: responseResult.response,
+                tone: (userSettings.defaultTone as any) || 'PROFESSIONAL',
+                isAiGenerated: true,
+                status: 'SCHEDULED',
+                scheduledAt: scheduledAt,
+                tokensUsed: responseResult.tokensUsed,
+                modelUsed: responseResult.model,
+              },
+            })
+            console.log(`Scheduled auto-reply for review ${newReview.id}`)
+          } catch (err) {
+            console.error('Auto-reply generation failed:', err)
+          }
+        }
       }
     }
 

@@ -35,6 +35,7 @@ export async function GET() {
       managerName: settings.managerName ?? '',
       preferredModel: settings.preferredModel ?? 'gpt-4o-mini',
       autoGenerateResponses: settings.autoGenerateResponses ?? false,
+      autoReplyFiveStar: settings.autoReplyFiveStar ?? false,
     })
   } catch (error) {
     console.error('Get AI config error:', error)
@@ -60,6 +61,7 @@ export async function PUT(request: NextRequest) {
       managerName,
       preferredModel,
       autoGenerateResponses,
+      autoReplyFiveStar,
     } = body
 
     const user = await prisma.user.findUnique({
@@ -81,6 +83,7 @@ export async function PUT(request: NextRequest) {
         managerName,
         preferredModel,
         autoGenerateResponses,
+        autoReplyFiveStar,
       },
       update: {
         defaultTone,
@@ -90,6 +93,7 @@ export async function PUT(request: NextRequest) {
         managerName,
         preferredModel,
         autoGenerateResponses,
+        autoReplyFiveStar,
       },
     })
 

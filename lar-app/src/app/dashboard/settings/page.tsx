@@ -482,6 +482,7 @@ function ToneSettingsTab() {
     managerName: '',
     preferredModel: 'gpt-4o-mini',
     autoGenerateResponses: false,
+    autoReplyFiveStar: false,
   })
   const [isSaving, setIsSaving] = React.useState(false)
   const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -614,6 +615,19 @@ function ToneSettingsTab() {
             />
             <label htmlFor="autoGenerateResponses" className="text-sm">
               Tự động tạo phản hồi AI cho đánh giá mới
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="autoReplyFiveStar"
+              checked={(localConfig as any).autoReplyFiveStar}
+              onChange={(e) => setLocalConfig({ ...localConfig, autoReplyFiveStar: e.target.checked } as any)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="autoReplyFiveStar" className="text-sm">
+              Tự động duyệt và trả lời đánh giá 5 sao (sau 15 phút)
             </label>
           </div>
 

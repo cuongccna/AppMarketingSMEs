@@ -28,6 +28,7 @@ interface AIConfig {
   managerName: string
   preferredModel: string
   autoGenerateResponses: boolean
+  autoReplyFiveStar: boolean
 }
 
 interface Template {

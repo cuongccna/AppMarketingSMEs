@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, Button, Input, useSnackbar, Icon } from "zmp-ui";
 import { getUserInfo } from "zmp-sdk/apis";
+import { openWebview } from "zmp-sdk";
 import { submitReview } from "services/api";
 
 interface ReviewSectionProps {
@@ -42,6 +43,12 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
         type: "success",
         duration: 3000,
       });
+
+      if (rating === 5) {
+        openWebview({
+          url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`,
+        });
+      }
       
       setRating(0);
       setComment("");

@@ -96,6 +96,7 @@ model UserSettings {
   // AI Model Settings
   preferredModel         String   @default("gpt-4o-mini")
   autoGenerateResponses  Boolean  @default(false)
+  autoReplyFiveStar      Boolean  @default(false)
   
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
@@ -283,6 +284,7 @@ enum ResponseStatus {
   APPROVED
   PUBLISHED
   REJECTED
+  SCHEDULED
 }
 
 enum ToneType {
@@ -300,6 +302,7 @@ model Response {
   tone          ToneType       @default(PROFESSIONAL)
   isAiGenerated Boolean        @default(true)
   status        ResponseStatus @default(DRAFT)
+  scheduledAt   DateTime?
   tokensUsed    Int?
   modelUsed     String?        // e.g., "gpt-4o-mini", "gemini-1.5-flash"
   approvedAt    DateTime?

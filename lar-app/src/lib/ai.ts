@@ -58,6 +58,7 @@ interface GenerateResponseParams {
   businessCategory?: string
   tone: ToneType
   language?: 'vi' | 'en'
+  customInstructions?: string
   preferredProvider?: AIProvider
 }
 
@@ -165,6 +166,7 @@ async function generateWithOpenAI(params: GenerateResponseParams): Promise<{
     businessCategory,
     tone,
     language = 'vi',
+    customInstructions,
   } = params
 
   const systemPrompt = `Bạn là chuyên gia quản lý danh tiếng cho doanh nghiệp "${businessName}"${businessCategory ? ` (ngành ${businessCategory})` : ''}.
@@ -179,6 +181,7 @@ Yêu cầu phản hồi:
 - Nếu đánh giá tiêu cực: xin lỗi, thể hiện sự thấu hiểu, đề xuất giải pháp
 - Nếu trung lập: cảm ơn góp ý và hứa cải thiện
 - Kết thúc bằng lời chúc hoặc lời mời quay lại
+${customInstructions ? `- Hướng dẫn bổ sung từ chủ doanh nghiệp: "${customInstructions}"` : ''}
 
 KHÔNG được:
 - Hứa hẹn cụ thể về giảm giá, bồi thường
@@ -228,6 +231,7 @@ async function generateWithGemini(params: GenerateResponseParams): Promise<{
     businessCategory,
     tone,
     language = 'vi',
+    customInstructions,
   } = params
 
   const genAI = getGeminiClient()
@@ -252,6 +256,7 @@ Yêu cầu:
 - Bắt đầu bằng lời chào với tên khách hàng: "${reviewerName}". Nếu tên là "User Name" hoặc "Khách hàng", hãy chào "Chào bạn".
 - Nếu tiêu cực: xin lỗi và đề xuất giải pháp
 - Kết thúc bằng lời chúc hoặc mời quay lại
+${customInstructions ? `- Hướng dẫn bổ sung từ chủ doanh nghiệp: "${customInstructions}"` : ''}
 
 KHÔNG được:
 - Hứa hẹn cụ thể về giảm giá, bồi thường
