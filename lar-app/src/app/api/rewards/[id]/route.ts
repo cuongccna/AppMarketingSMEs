@@ -8,6 +8,7 @@ const updateRewardSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   image: z.string().optional(),
+  imageBase64: z.string().optional(),
   pointsRequired: z.number().int().min(1).optional(),
   isActive: z.boolean().optional(),
 })
@@ -42,9 +43,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    let imageBinary = undefined
+    if (data.imageBase64) {
+      const base64Data = data.imageBase64.replace(/^data:image\/\w+;base64,/, "")
+      imageBinary = Buffer.from(base64Data, 'base64')
+    }
+
+    // Remove imageBase64 from data object before passing to prisma
+    const { imageBase64, ...updateData } = data
+
     const updatedReward = await prisma.reward.update({
       where: { id: params.id },
-      data
+      data: {
+        ...updateData,
+        imageBinary: imageBinary,
+      }
     })
 
     return NextResponse.json({ success: true, data: updatedReward })

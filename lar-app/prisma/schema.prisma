@@ -450,6 +450,7 @@ model Reward {
   name          String
   description   String?
   image         String?
+  imageBinary   Bytes?
   pointsRequired Int
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())

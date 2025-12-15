@@ -37,6 +37,8 @@ export const metadata: Metadata = {
   },
 }
 
+import { InstallPrompt } from '@/components/pwa/install-prompt'
+
 export default function RootLayout({
   children,
 }: {
@@ -45,7 +47,10 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <InstallPrompt />
+        </Providers>
       </body>
     </html>
   )

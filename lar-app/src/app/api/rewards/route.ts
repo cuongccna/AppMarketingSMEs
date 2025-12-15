@@ -9,6 +9,7 @@ const createRewardSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   image: z.string().optional(),
+  imageBase64: z.string().optional(),
   pointsRequired: z.number().int().min(1),
   isActive: z.boolean().optional(),
 })
@@ -50,7 +51,16 @@ export async function GET(request: NextRequest) {
       orderBy: { pointsRequired: 'asc' }
     })
 
-    return NextResponse.json({ success: true, data: rewards })
+    // Convert binary image to base64 for frontend
+    const rewardsWithImages = rewards.map(r => ({
+      ...r,
+      image: r.imageBinary 
+        ? `data:image/png;base64,${r.imageBinary.toString('base64')}`
+        : r.image,
+      imageBinary: undefined // Don't send raw buffer
+    }))
+
+    return NextResponse.json({ success: true, data: rewardsWithImages })
   } catch (error) {
     console.error('Get rewards error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -85,12 +95,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    let imageBinary = undefined
+    if (data.imageBase64) {
+      const base64Data = data.imageBase64.replace(/^data:image\/\w+;base64,/, "")
+      imageBinary = Buffer.from(base64Data, 'base64')
+    }
+
     const reward = await prisma.reward.create({
       data: {
         locationId: data.locationId,
         name: data.name,
         description: data.description,
-        image: data.image,
+        image: data.image || '/icons/icon-512x512.png',
+        imageBinary: imageBinary,
         pointsRequired: data.pointsRequired,
         isActive: data.isActive ?? true,
       }

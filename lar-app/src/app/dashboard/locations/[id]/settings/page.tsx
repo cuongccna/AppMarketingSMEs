@@ -252,13 +252,14 @@ export default function LocationSettingsPage() {
                 {rewards.map((reward) => (
                   <div key={reward.id} className="border rounded-lg p-4 flex flex-col gap-3 relative group">
                     <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                      {reward.image ? (
-                        <img src={reward.image} alt={reward.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          <Gift className="h-8 w-8" />
-                        </div>
-                      )}
+                      <img 
+                        src={reward.image || '/icons/icon-512x512.png'} 
+                        alt={reward.name} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/icons/icon-512x512.png'
+                        }}
+                      />
                     </div>
                     <div>
                       <h3 className="font-bold">{reward.name}</h3>
@@ -295,7 +296,7 @@ export default function LocationSettingsPage() {
         <RewardModal 
           isOpen={isRewardModalOpen} 
           onClose={() => setIsRewardModalOpen(false)}
-          onSubmit={async (data: { name: string; description: string; pointsRequired: number; image: string }) => {
+          onSubmit={async (data: { name: string; description: string; pointsRequired: number; image: string; imageBase64?: string }) => {
             try {
               const url = editingReward ? `/api/rewards/${editingReward.id}` : '/api/rewards'
               const method = editingReward ? 'PATCH' : 'POST'
@@ -326,7 +327,7 @@ export default function LocationSettingsPage() {
 interface RewardModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: { name: string; description: string; pointsRequired: number; image: string }) => Promise<void>
+  onSubmit: (data: { name: string; description: string; pointsRequired: number; image: string; imageBase64?: string }) => Promise<void>
   initialData?: Reward | null
 }
 
@@ -335,12 +336,27 @@ function RewardModal({ isOpen, onClose, onSubmit, initialData }: RewardModalProp
   const [description, setDescription] = useState(initialData?.description || '')
   const [pointsRequired, setPointsRequired] = useState(initialData?.pointsRequired?.toString() || '100')
   const [image, setImage] = useState(initialData?.image || '')
+  const [imageBase64, setImageBase64] = useState('')
+  const [previewImage, setPreviewImage] = useState(initialData?.image || '')
   const [submitting, setSubmitting] = useState(false)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const base64 = reader.result as string
+        setImageBase64(base64)
+        setPreviewImage(base64)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
-    await onSubmit({ name, description, pointsRequired: parseInt(pointsRequired), image })
+    await onSubmit({ name, description, pointsRequired: parseInt(pointsRequired), image, imageBase64 })
     setSubmitting(false)
   }
 
@@ -348,7 +364,7 @@ function RewardModal({ isOpen, onClose, onSubmit, initialData }: RewardModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md m-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md m-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">{initialData ? 'Sửa quà tặng' : 'Thêm quà tặng mới'}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -364,8 +380,21 @@ function RewardModal({ isOpen, onClose, onSubmit, initialData }: RewardModalProp
             <Input type="number" value={pointsRequired} onChange={e => setPointsRequired(e.target.value)} required min={1} />
           </div>
           <div>
-            <label className="text-sm font-medium">Link hình ảnh (URL)</label>
-            <Input value={image} onChange={e => setImage(e.target.value)} placeholder="https://..." />
+            <label className="text-sm font-medium">Hình ảnh</label>
+            <div className="space-y-2 mt-1">
+              <Input 
+                type="file" 
+                accept="image/*"
+                onChange={handleFileChange} 
+              />
+              <div className="text-xs text-muted-foreground text-center">- Hoặc -</div>
+              <Input value={image} onChange={e => { setImage(e.target.value); setPreviewImage(e.target.value) }} placeholder="Nhập URL ảnh..." />
+            </div>
+            {previewImage && (
+               <div className="mt-2 border rounded p-1 w-fit">
+                 <img src={previewImage} className="h-20 w-20 object-cover rounded" onError={(e) => (e.target as HTMLImageElement).style.display = 'none'} />
+               </div>
+            )}
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <Button type="button" variant="outline" onClick={onClose}>Hủy</Button>
