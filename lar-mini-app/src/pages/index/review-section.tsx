@@ -25,6 +25,13 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
       return;
     }
 
+    // Ưu tiên chuyển hướng ngay lập tức nếu 5 sao
+    if (rating === 5) {
+      openWebview({
+        url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`,
+      });
+    }
+
     setSubmitting(true);
     try {
       const { userInfo } = await getUserInfo({});
@@ -44,14 +51,17 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({ locationId, locati
         duration: 3000,
       });
 
-      if (rating === 5) {
-        openWebview({
-          url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`,
-        });
+      // Nếu không phải 5 sao thì mới reset form ngay (5 sao thì người dùng đang ở trang khác)
+      if (rating !== 5) {
+        setRating(0);
+        setComment("");
+      } else {
+        // Reset sau một khoảng thời gian để khi quay lại form đã sạch
+        setTimeout(() => {
+          setRating(0);
+          setComment("");
+        }, 2000);
       }
-      
-      setRating(0);
-      setComment("");
       
       // Wait a bit for backend to process points
       setTimeout(() => {
