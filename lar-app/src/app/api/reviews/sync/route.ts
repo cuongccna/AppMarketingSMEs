@@ -133,7 +133,13 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      let currentReviewId: string
+      let currentSentiment: string
+
       if (existingReview) {
+        currentReviewId = existingReview.id
+        currentSentiment = existingReview.sentiment
+
         // Update if content changed
         if (existingReview.content !== reviewData.content) {
           await prisma.review.update({
@@ -167,20 +173,30 @@ export async function POST(request: NextRequest) {
           },
         })
         newReviewsCount++
+        
+        currentReviewId = newReview.id
+        currentSentiment = sentimentResult.sentiment
+      }
 
-        // Auto-Reply Logic for 5-star positive reviews
-        if (
-          userSettings?.autoReplyFiveStar &&
-          reviewData.rating === 5 &&
-          sentimentResult.sentiment === 'POSITIVE' &&
-          !reviewData.hasReply
-        ) {
-          try {
+      // Auto-Reply Logic for 5-star positive reviews (Check for both new and existing reviews)
+      if (
+        userSettings?.autoReplyFiveStar &&
+        reviewData.rating === 5 &&
+        currentSentiment === 'POSITIVE' &&
+        !reviewData.hasReply
+      ) {
+        try {
+          // Check if we already have a response locally (to avoid duplicates)
+          const existingResponse = await prisma.response.findFirst({
+            where: { reviewId: currentReviewId },
+          })
+
+          if (!existingResponse) {
             const responseResult = await generateReviewResponse({
               reviewContent: reviewData.content || '',
               reviewerName: reviewData.authorName,
               rating: reviewData.rating,
-              sentiment: sentimentResult.sentiment,
+              sentiment: currentSentiment as any,
               businessName: location.business.name,
               tone: (userSettings.defaultTone as any) || 'PROFESSIONAL',
               customInstructions: userSettings.customInstructions || undefined,
@@ -193,7 +209,7 @@ export async function POST(request: NextRequest) {
 
             await prisma.response.create({
               data: {
-                reviewId: newReview.id,
+                reviewId: currentReviewId,
                 content: responseResult.response,
                 tone: (userSettings.defaultTone as any) || 'PROFESSIONAL',
                 isAiGenerated: true,
@@ -203,10 +219,10 @@ export async function POST(request: NextRequest) {
                 modelUsed: responseResult.model,
               },
             })
-            console.log(`Scheduled auto-reply for review ${newReview.id}`)
-          } catch (err) {
-            console.error('Auto-reply generation failed:', err)
+            console.log(`Scheduled auto-reply for review ${currentReviewId}`)
           }
+        } catch (err) {
+          console.error('Auto-reply generation failed:', err)
         }
       }
     }
