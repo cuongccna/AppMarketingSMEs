@@ -33,16 +33,38 @@ export async function GET(request: NextRequest) {
         reward: {
           select: {
             name: true,
-            image: true
+            image: true,
+            imageBinary: true
           }
         }
       },
       orderBy: { createdAt: 'desc' }
     })
 
+    // Transform redemptions to include image URL or Base64
+    const transformedRedemptions = redemptions.map(redemption => {
+      let imageUrl = redemption.reward.image || ''
+      
+      if (redemption.reward.imageBinary) {
+        const base64String = Buffer.from(redemption.reward.imageBinary).toString('base64')
+        imageUrl = `data:image/jpeg;base64,${base64String}`
+      }
+
+      // Create a new reward object without imageBinary
+      const { imageBinary, ...rewardRest } = redemption.reward
+      
+      return {
+        ...redemption,
+        reward: {
+          ...rewardRest,
+          image: imageUrl
+        }
+      }
+    })
+
     return NextResponse.json({
       success: true,
-      data: redemptions
+      data: transformedRedemptions
     })
   } catch (error) {
     console.error('Error fetching redemption history:', error)

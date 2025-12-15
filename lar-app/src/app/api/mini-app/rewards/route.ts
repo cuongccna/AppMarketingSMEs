@@ -24,9 +24,27 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Transform rewards to include image URL or Base64
+    const transformedRewards = rewards.map(reward => {
+      let imageUrl = reward.image || ''
+      
+      if (reward.imageBinary) {
+        const base64String = Buffer.from(reward.imageBinary).toString('base64')
+        imageUrl = `data:image/jpeg;base64,${base64String}`
+      }
+
+      // Remove imageBinary from response to reduce size and avoid serialization issues
+      const { imageBinary, ...rest } = reward
+      
+      return {
+        ...rest,
+        image: imageUrl
+      }
+    })
+
     return NextResponse.json({
       success: true,
-      data: rewards
+      data: transformedRewards
     })
   } catch (error) {
     console.error('Error fetching rewards:', error)
