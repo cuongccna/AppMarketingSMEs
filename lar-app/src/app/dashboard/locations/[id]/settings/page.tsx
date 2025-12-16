@@ -45,6 +45,9 @@ export default function LocationSettingsPage() {
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false)
   const [editingReward, setEditingReward] = useState<Reward | null>(null)
 
+  // Zalo Mini App ID (Constant)
+  const ZALO_MINI_APP_ID = '4089738620528471173'
+
   useEffect(() => {
     fetchData()
   }, [locationId])
@@ -194,7 +197,7 @@ export default function LocationSettingsPage() {
               <div className="bg-white p-4 rounded-lg border shadow-sm">
                 <QRCodeSVG 
                   id="location-qr"
-                  value={`https://zalo.me/s/4089738620528471173/?locationId=${locationId}`}
+                  value={`https://zalo.me/s/${ZALO_MINI_APP_ID}/?locationId=${locationId}`}
                   size={200}
                   level="H"
                   includeMargin={true}

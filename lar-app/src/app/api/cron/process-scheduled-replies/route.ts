@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { GoogleBusinessProfileClient } from '@/lib/google-business'
 import { generateReviewResponse } from '@/lib/ai'
+import { createZaloOAClient } from '@/lib/zalo-oa'
 
 export const dynamic = 'force-dynamic' // Ensure it's not cached
 
@@ -112,6 +113,7 @@ export async function GET(request: NextRequest) {
 
     let processedCount = 0
     let errorCount = 0
+    const errorDetails: any[] = []
 
     if (scheduledResponses.length > 0) {
         for (const response of scheduledResponses) {
@@ -121,7 +123,9 @@ export async function GET(request: NextRequest) {
             const gbpConnection = location.platformConnections[0]
 
             if (!gbpConnection || !gbpConnection.accessToken) {
-              console.error(`No GBP connection for location ${location.id}`)
+              const msg = `No GBP connection for location ${location.id}`
+              console.error(msg)
+              errorDetails.push({ id: response.id, error: msg })
               errorCount++
               continue
             }
@@ -157,9 +161,46 @@ export async function GET(request: NextRequest) {
               }),
             ])
 
+            // ---------------------------------------------------------
+            // 3. Send Notification to Zalo (if applicable)
+            // ---------------------------------------------------------
+            if (review.zaloUserId) {
+              try {
+                // Find customer to link notification
+                const customer = await prisma.customer.findFirst({
+                  where: { zaloId: review.zaloUserId }
+                })
+
+                if (customer) {
+                  // Create in-app notification
+                  await prisma.notification.create({
+                    data: {
+                      title: `Phản hồi từ ${location.name}`,
+                      content: `Cửa hàng đã phản hồi đánh giá của bạn: "${response.content.substring(0, 50)}..."`,
+                      type: 'REVIEW',
+                      customerId: customer.id,
+                      isRead: false
+                    }
+                  })
+
+                  // Send Zalo OA Message
+                  const zaloClient = createZaloOAClient()
+                  await zaloClient.sendTextMessage(
+                    review.zaloUserId,
+                    `Cảm ơn bạn đã đánh giá! ${location.name} vừa phản hồi: "${response.content}"`
+                  )
+                  console.log(`Sent Zalo notification to ${review.zaloUserId}`)
+                }
+              } catch (zaloError) {
+                console.error(`Failed to send Zalo notification for review ${review.id}:`, zaloError)
+                // Don't fail the whole process if notification fails
+              }
+            }
+
             processedCount++
-          } catch (error) {
+          } catch (error: any) {
             console.error(`Failed to process response ${response.id}:`, error)
+            errorDetails.push({ id: response.id, error: error.message || error })
             errorCount++
           }
         }
@@ -170,6 +211,7 @@ export async function GET(request: NextRequest) {
       scheduledNew: scheduledCount,
       processed: processedCount,
       errors: errorCount,
+      errorDetails: errorDetails
     })
   } catch (error) {
     console.error('Cron job error:', error)
