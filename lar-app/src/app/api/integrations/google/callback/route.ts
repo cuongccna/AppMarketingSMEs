@@ -93,8 +93,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(new URL('/dashboard/businesses?success=google_connected', request.url))
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Google callback error:', error)
-    return NextResponse.redirect(new URL('/dashboard/businesses?error=callback_error', request.url))
+    const errorMessage = error?.message || 'Unknown error'
+    return NextResponse.redirect(new URL(`/dashboard/businesses?error=callback_error&details=${encodeURIComponent(errorMessage)}`, request.url))
   }
 }
