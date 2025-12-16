@@ -122,7 +122,7 @@ export async function DELETE(
     const platform = searchParams.get('platform')
 
     if (!locationId || !platform) {
-      return NextResponse.json({ error: 'locationId and platform required' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing locationId or platform' }, { status: 400 })
     }
 
     // Check business ownership
@@ -152,7 +152,7 @@ export async function DELETE(
     // Delete connection
     await prisma.platformConnection.deleteMany({
       where: {
-        locationId,
+        locationId: locationId,
         platform: platform as any,
       },
     })
@@ -163,3 +163,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+
+
+

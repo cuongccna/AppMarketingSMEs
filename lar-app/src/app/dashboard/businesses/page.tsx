@@ -313,6 +313,164 @@ function ConnectPlatformModal({
   )
 }
 
+interface ConnectionDetailsModalProps {
+  isOpen: boolean
+  onClose: () => void
+  businessId: string
+  platform: 'gbp' | 'zalo'
+  connection: {
+    locationId: string
+    locationName: string
+    externalId: string
+    lastSync: string | null
+  }
+  onDisconnect: (businessId: string, locationId: string, platform: string) => Promise<void>
+  onCheckConnection: (businessId: string, locationId: string, platform: string) => Promise<{ status: string; message: string }>
+  isLoading: boolean
+}
+
+function ConnectionDetailsModal({
+  isOpen,
+  onClose,
+  businessId,
+  platform,
+  connection,
+  onDisconnect,
+  onCheckConnection,
+  isLoading
+}: ConnectionDetailsModalProps) {
+  const [checkStatus, setCheckStatus] = React.useState<{ status: string; message: string } | null>(null)
+  const [isChecking, setIsChecking] = React.useState(false)
+
+  const platformInfo = {
+    gbp: {
+      name: 'Google Business Profile',
+      icon: <Chrome className="h-6 w-6 text-blue-500" />,
+    },
+    zalo: {
+      name: 'Zalo Official Account',
+      icon: <MessageSquare className="h-6 w-6 text-blue-600" />,
+    },
+  }
+
+  const info = platformInfo[platform]
+
+  const handleDisconnect = async () => {
+    if (confirm('Bạn có chắc muốn ngắt kết nối này? Việc này sẽ dừng đồng bộ đánh giá và phản hồi tự động.')) {
+      const platformEnum = platform === 'gbp' ? 'GOOGLE_BUSINESS_PROFILE' : 'ZALO_OA'
+      await onDisconnect(businessId, connection.locationId, platformEnum)
+      onClose()
+    }
+  }
+
+  const handleCheck = async () => {
+    setIsChecking(true)
+    setCheckStatus(null)
+    const platformEnum = platform === 'gbp' ? 'GOOGLE_BUSINESS_PROFILE' : 'ZALO_OA'
+    const result = await onCheckConnection(businessId, connection.locationId, platformEnum)
+    setCheckStatus(result)
+    setIsChecking(false)
+  }
+
+  // Reset state when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setCheckStatus(null)
+      setIsChecking(false)
+    }
+  }, [isOpen])
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {info.icon}
+            Chi tiết kết nối
+          </DialogTitle>
+          <DialogDescription>
+            Thông tin kết nối {info.name}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <div className="font-medium text-muted-foreground">Địa điểm:</div>
+            <div className="col-span-2 font-medium">{connection.locationName}</div>
+            
+            <div className="font-medium text-muted-foreground">External ID:</div>
+            <div className="col-span-2 font-mono text-xs bg-muted p-1 rounded break-all">
+              {connection.externalId}
+            </div>
+
+            <div className="font-medium text-muted-foreground">Đồng bộ lần cuối:</div>
+            <div className="col-span-2">
+              {connection.lastSync ? new Date(connection.lastSync).toLocaleString('vi-VN') : 'Chưa đồng bộ'}
+            </div>
+          </div>
+
+          {/* Check Status Result */}
+          {checkStatus && (
+            <div className={`p-3 rounded-md text-sm flex gap-2 items-start ${
+              checkStatus.status === 'ACTIVE' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+            }`}>
+              {checkStatus.status === 'ACTIVE' ? (
+                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+              ) : (
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              )}
+              <div>
+                <p className="font-medium">{checkStatus.status === 'ACTIVE' ? 'Kết nối hoạt động tốt' : 'Kết nối gặp sự cố'}</p>
+                <p className="text-xs mt-1">{checkStatus.message}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md text-sm flex gap-2 items-start">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <p>
+              Ngắt kết nối sẽ dừng việc đồng bộ đánh giá và phản hồi tự động cho địa điểm này.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter className="flex justify-between sm:justify-between">
+          <Button 
+            variant="secondary" 
+            onClick={handleCheck}
+            disabled={isChecking || isLoading}
+          >
+            {isChecking ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Đang kiểm tra...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Kiểm tra kết nối
+              </>
+            )}
+          </Button>
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Đóng
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDisconnect}
+              disabled={isLoading || isChecking}
+            >
+              {isLoading ? 'Đang ngắt...' : 'Ngắt kết nối'}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function BusinessesPage() {
   const { 
     businesses, 
@@ -322,7 +480,9 @@ export default function BusinessesPage() {
     createBusiness, 
     updateBusiness,
     deleteBusiness, 
-    connectPlatform 
+    connectPlatform,
+    disconnectPlatform,
+    checkConnection
   } = useBusinesses()
   
   const { toast } = useToast()
@@ -360,6 +520,28 @@ export default function BusinessesPage() {
     businessName: '',
     platform: 'gbp',
     locations: [],
+  })
+
+  const [detailsModal, setDetailsModal] = React.useState<{
+    isOpen: boolean
+    businessId: string
+    platform: 'gbp' | 'zalo'
+    connection: {
+      locationId: string
+      locationName: string
+      externalId: string
+      lastSync: string | null
+    }
+  }>({
+    isOpen: false,
+    businessId: '',
+    platform: 'gbp',
+    connection: {
+      locationId: '',
+      locationName: '',
+      externalId: '',
+      lastSync: null
+    }
   })
 
   useEffect(() => {
@@ -459,6 +641,25 @@ export default function BusinessesPage() {
     }
   }
 
+  const handleDisconnectPlatform = async (businessId: string, locationId: string, platform: string) => {
+    setIsSaving(true)
+    const result = await disconnectPlatform(businessId, locationId, platform)
+    setIsSaving(false)
+    if (result) {
+      toast({
+        title: "Đã ngắt kết nối",
+        description: "Đã ngắt kết nối thành công.",
+      })
+      setDetailsModal({ ...detailsModal, isOpen: false })
+    } else {
+      toast({
+        title: "Lỗi",
+        description: "Không thể ngắt kết nối.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const formatLastSync = (dateStr: string | null | undefined) => {
     if (!dateStr) return 'Chưa đồng bộ'
     const date = new Date(dateStr)
@@ -483,18 +684,29 @@ export default function BusinessesPage() {
       loc.platformConnections?.some((pc: any) => pc.platform === 'ZALO_OA' && pc.isConnected)
     )
     
-    const gbpConnection = locations.flatMap((loc: any) => loc.platformConnections || [])
-      .find((pc: any) => pc.platform === 'GOOGLE_BUSINESS_PROFILE')
-    const zaloConnection = locations.flatMap((loc: any) => loc.platformConnections || [])
-      .find((pc: any) => pc.platform === 'ZALO_OA')
+    const gbpConnection = locations.flatMap((loc: any) => 
+      (loc.platformConnections || []).map((pc: any) => ({ ...pc, locationName: loc.name }))
+    ).find((pc: any) => pc.platform === 'GOOGLE_BUSINESS_PROFILE')
+
+    const zaloConnection = locations.flatMap((loc: any) => 
+      (loc.platformConnections || []).map((pc: any) => ({ ...pc, locationName: loc.name }))
+    ).find((pc: any) => pc.platform === 'ZALO_OA')
 
     return {
       ...b,
       locationCount: locations.length,
       totalReviews,
       platforms: {
-        gbp: { connected: hasGbp, lastSync: gbpConnection?.lastSyncAt },
-        zalo: { connected: hasZalo, lastSync: zaloConnection?.lastSyncAt },
+        gbp: { 
+          connected: hasGbp, 
+          lastSync: gbpConnection?.lastSyncAt,
+          details: gbpConnection 
+        },
+        zalo: { 
+          connected: hasZalo, 
+          lastSync: zaloConnection?.lastSyncAt,
+          details: zaloConnection
+        },
       },
     }
   })
@@ -644,7 +856,20 @@ export default function BusinessesPage() {
                       </div>
                     </div>
                     {business.platforms.gbp.connected ? (
-                      <Badge className="gap-1 bg-green-100 text-green-800">
+                      <Badge 
+                        className="gap-1 bg-green-100 text-green-800 cursor-pointer hover:bg-green-200"
+                        onClick={() => setDetailsModal({
+                          isOpen: true,
+                          businessId: business.id,
+                          platform: 'gbp',
+                          connection: {
+                            locationId: business.platforms.gbp.details.locationId,
+                            locationName: business.platforms.gbp.details.locationName,
+                            externalId: business.platforms.gbp.details.externalId,
+                            lastSync: business.platforms.gbp.details.lastSyncAt
+                          }
+                        })}
+                      >
                         <CheckCircle2 className="h-3 w-3" />
                         Đã kết nối
                       </Badge>
@@ -681,7 +906,20 @@ export default function BusinessesPage() {
                       </div>
                     </div>
                     {business.platforms.zalo.connected ? (
-                      <Badge className="gap-1 bg-green-100 text-green-800">
+                      <Badge 
+                        className="gap-1 bg-green-100 text-green-800 cursor-pointer hover:bg-green-200"
+                        onClick={() => setDetailsModal({
+                          isOpen: true,
+                          businessId: business.id,
+                          platform: 'zalo',
+                          connection: {
+                            locationId: business.platforms.zalo.details.locationId,
+                            locationName: business.platforms.zalo.details.locationName,
+                            externalId: business.platforms.zalo.details.externalId,
+                            lastSync: business.platforms.zalo.details.lastSyncAt
+                          }
+                        })}
+                      >
                         <CheckCircle2 className="h-3 w-3" />
                         Đã kết nối
                       </Badge>
@@ -757,6 +995,17 @@ export default function BusinessesPage() {
         onConnect={handleConnectPlatform}
         isLoading={isSaving}
         locations={connectModal.locations}
+      />
+
+      <ConnectionDetailsModal
+        isOpen={detailsModal.isOpen}
+        onClose={() => setDetailsModal({ ...detailsModal, isOpen: false })}
+        businessId={detailsModal.businessId}
+        platform={detailsModal.platform}
+        connection={detailsModal.connection}
+        onDisconnect={handleDisconnectPlatform}
+        onCheckConnection={checkConnection}
+        isLoading={isSaving}
       />
     </DashboardLayout>
   )

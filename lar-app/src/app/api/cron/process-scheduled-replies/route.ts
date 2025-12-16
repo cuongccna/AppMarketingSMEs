@@ -123,7 +123,8 @@ export async function GET(request: NextRequest) {
             const gbpConnection = location.platformConnections[0]
 
             if (!gbpConnection || !gbpConnection.accessToken) {
-              const msg = `No GBP connection for location ${location.id}`
+              const connections = location.platformConnections.map((c: any) => `${c.platform} (Connected: ${c.isConnected})`).join(', ')
+              const msg = `No GBP connection for location ${location.id}. Found: ${connections || 'None'}`
               console.error(msg)
               errorDetails.push({ id: response.id, error: msg })
               errorCount++

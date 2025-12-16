@@ -42,6 +42,8 @@ interface UseBusinessesReturn {
   updateBusiness: (id: string, data: Partial<Business>) => Promise<boolean>
   deleteBusiness: (id: string) => Promise<boolean>
   connectPlatform: (businessId: string, data: { platform: string; externalId: string; locationId: string }) => Promise<boolean>
+  disconnectPlatform: (businessId: string, locationId: string, platform: string) => Promise<boolean>
+  checkConnection: (businessId: string, locationId: string, platform: string) => Promise<{ status: string; message: string }>
 }
 
 export function useBusinesses(): UseBusinessesReturn {
@@ -161,6 +163,56 @@ export function useBusinesses(): UseBusinessesReturn {
     }
   }, [fetchBusinesses])
 
+  const disconnectPlatform = useCallback(async (
+    businessId: string,
+    locationId: string,
+    platform: string
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        `/api/businesses/${businessId}/connect-platform?locationId=${locationId}&platform=${platform}`,
+        {
+          method: 'DELETE',
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to disconnect platform')
+      }
+
+      await fetchBusinesses()
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to disconnect platform')
+      return false
+    }
+  }, [fetchBusinesses])
+
+  const checkConnection = useCallback(async (
+    businessId: string,
+    locationId: string,
+    platform: string
+  ): Promise<{ status: string; message: string }> => {
+    try {
+      const response = await fetch(
+        `/api/businesses/${businessId}/check-connection?locationId=${locationId}&platform=${platform}`
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to check connection')
+      }
+
+      return await response.json()
+    } catch (err) {
+      return { 
+        status: 'ERROR', 
+        message: err instanceof Error ? err.message : 'Failed to check connection' 
+      }
+    }
+  }, [])
+
   return {
     businesses,
     isLoading,
@@ -171,5 +223,7 @@ export function useBusinesses(): UseBusinessesReturn {
     updateBusiness,
     deleteBusiness,
     connectPlatform,
+    disconnectPlatform,
+    checkConnection,
   }
 }
