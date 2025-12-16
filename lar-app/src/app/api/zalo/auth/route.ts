@@ -8,12 +8,15 @@ export const dynamic = 'force-dynamic'
  * GET /api/zalo/auth
  * Generate Zalo OAuth URL for OA authorization
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId')
 
     const appId = process.env.ZALO_APP_ID
     const redirectUri = process.env.ZALO_REDIRECT_URI || `${process.env.NEXTAUTH_URL}/api/zalo/callback`
@@ -28,6 +31,7 @@ export async function GET() {
     // Create state with user info for security
     const state = Buffer.from(JSON.stringify({
       userId: (session.user as { id: string }).id,
+      locationId,
       timestamp: Date.now(),
     })).toString('base64')
 

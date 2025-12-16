@@ -203,7 +203,6 @@ function ConnectPlatformModal({
   isLoading,
   locations
 }: ConnectPlatformModalProps) {
-  const [externalId, setExternalId] = React.useState('')
   const [selectedLocation, setSelectedLocation] = React.useState('')
 
   const platformInfo = {
@@ -211,29 +210,35 @@ function ConnectPlatformModal({
       name: 'Google Business Profile',
       icon: <Chrome className="h-8 w-8 text-blue-500" />,
       description: 'Kết nối với Google Business Profile để đồng bộ đánh giá từ Google Maps và Search.',
-      placeholder: 'Place ID hoặc Account ID',
     },
     zalo: {
       name: 'Zalo Official Account',
       icon: <MessageSquare className="h-8 w-8 text-blue-600" />,
       description: 'Kết nối Zalo OA để nhận đánh giá và gửi thông báo qua Zalo.',
-      placeholder: 'OA ID',
     },
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const platformMap = {
-      gbp: 'GOOGLE_BUSINESS_PROFILE',
-      zalo: 'ZALO_OA',
+  const handleConnect = async () => {
+    if (!selectedLocation) return
+
+    try {
+      let authUrl = ''
+      if (platform === 'gbp') {
+        const res = await fetch(`/api/integrations/google/auth?locationId=${selectedLocation}`)
+        const data = await res.json()
+        if (data.authUrl) authUrl = data.authUrl
+      } else if (platform === 'zalo') {
+        const res = await fetch(`/api/zalo/auth?locationId=${selectedLocation}`)
+        const data = await res.json()
+        if (data.authUrl) authUrl = data.authUrl
+      }
+
+      if (authUrl) {
+        window.location.href = authUrl
+      }
+    } catch (error) {
+      console.error('Failed to get auth url', error)
     }
-    await onConnect({
-      platform: platformMap[platform],
-      externalId,
-      locationId: selectedLocation,
-    })
-    setExternalId('')
-    setSelectedLocation('')
   }
 
   if (!isOpen) return null
@@ -255,7 +260,7 @@ function ConnectPlatformModal({
 
         <p className="text-sm text-gray-600 mb-4">{info.description}</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           <div>
             <label className="text-sm font-medium">Chọn địa điểm</label>
             <select
@@ -276,14 +281,12 @@ function ConnectPlatformModal({
             )}
           </div>
 
-          <div>
-            <label className="text-sm font-medium">{info.placeholder}</label>
-            <Input
-              value={externalId}
-              onChange={(e) => setExternalId(e.target.value)}
-              placeholder={info.placeholder}
-              required
-            />
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <h4 className="font-medium text-blue-900 mb-2">Lưu ý quan trọng</h4>
+            <p className="text-sm text-blue-800">
+              Hệ thống sẽ chuyển hướng bạn đến trang đăng nhập của {info.name}. 
+              Vui lòng cấp quyền truy cập để hệ thống có thể tự động đồng bộ dữ liệu.
+            </p>
           </div>
 
           <DialogFooter>
@@ -291,23 +294,25 @@ function ConnectPlatformModal({
               Hủy
             </Button>
             <Button 
-              type="submit" 
-              disabled={isLoading || !externalId || !selectedLocation}
+              type="button"
+              onClick={handleConnect}
+              disabled={isLoading || !selectedLocation}
+              className="bg-blue-600 hover:bg-blue-700"
             >
               {isLoading ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Đang kết nối...
+                  Đang chuyển hướng...
                 </>
               ) : (
                 <>
                   <LinkIcon className="h-4 w-4 mr-2" />
-                  Kết nối ngay
+                  Kết nối với {platform === 'gbp' ? 'Google' : 'Zalo'}
                 </>
               )}
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   )

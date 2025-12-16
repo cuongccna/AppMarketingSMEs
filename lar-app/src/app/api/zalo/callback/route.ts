@@ -20,16 +20,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Decode state
-    let stateData: { userId: string; timestamp: number }
+    let stateData: { userId: string; locationId?: string; timestamp: number }
     try {
       stateData = JSON.parse(Buffer.from(state, 'base64').toString())
     } catch {
-      return NextResponse.redirect(new URL('/dashboard/settings?error=invalid_state', request.url))
+      return NextResponse.redirect(new URL('/dashboard/businesses?error=invalid_state', request.url))
     }
 
     // Verify state is not too old (5 minutes)
     if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
-      return NextResponse.redirect(new URL('/dashboard/settings?error=expired_state', request.url))
+      return NextResponse.redirect(new URL('/dashboard/businesses?error=expired_state', request.url))
     }
 
     const appId = process.env.ZALO_APP_ID!
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     if (tokenData.error) {
       console.error('Zalo token error:', tokenData)
-      return NextResponse.redirect(new URL('/dashboard/settings?error=token_error', request.url))
+      return NextResponse.redirect(new URL('/dashboard/businesses?error=token_error', request.url))
     }
 
     const { access_token, refresh_token, expires_in } = tokenData
@@ -73,32 +73,37 @@ export async function GET(request: NextRequest) {
       console.error('Failed to get OA profile:', error)
     }
 
-    // Find user's first business and location to store the connection
-    const user = await prisma.user.findUnique({
-      where: { id: stateData.userId },
-      include: {
-        businesses: {
-          include: {
-            locations: true,
+    let locationId = stateData.locationId
+
+    if (!locationId) {
+      // Fallback: Find user's first business and location
+      const user = await prisma.user.findUnique({
+        where: { id: stateData.userId },
+        include: {
+          businesses: {
+            include: {
+              locations: true,
+            },
           },
         },
-      },
-    })
+      })
 
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.redirect(new URL('/dashboard/settings?error=no_business', request.url))
-    }
+      if (!user || user.businesses.length === 0) {
+        return NextResponse.redirect(new URL('/dashboard/businesses?error=no_business', request.url))
+      }
 
-    const location = user.businesses[0].locations[0]
-    if (!location) {
-      return NextResponse.redirect(new URL('/dashboard/settings?error=no_location', request.url))
+      const location = user.businesses[0].locations[0]
+      if (!location) {
+        return NextResponse.redirect(new URL('/dashboard/businesses?error=no_location', request.url))
+      }
+      locationId = location.id
     }
 
     // Upsert platform connection
     await prisma.platformConnection.upsert({
       where: {
         locationId_platform: {
-          locationId: location.id,
+          locationId: locationId,
           platform: 'ZALO_OA',
         },
       },
@@ -112,7 +117,7 @@ export async function GET(request: NextRequest) {
         lastSyncAt: new Date(),
       },
       create: {
-        locationId: location.id,
+        locationId: locationId,
         platform: 'ZALO_OA',
         accessToken: access_token,
         refreshToken: refresh_token,
@@ -124,10 +129,10 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Redirect to settings with success
-    return NextResponse.redirect(new URL('/dashboard/settings?tab=integrations&success=zalo_connected', request.url))
+    // Redirect to businesses with success
+    return NextResponse.redirect(new URL('/dashboard/businesses?success=zalo_connected', request.url))
   } catch (error) {
     console.error('Zalo callback error:', error)
-    return NextResponse.redirect(new URL('/dashboard/settings?error=callback_error', request.url))
+    return NextResponse.redirect(new URL('/dashboard/businesses?error=callback_error', request.url))
   }
 }
