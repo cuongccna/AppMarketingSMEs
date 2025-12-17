@@ -223,6 +223,30 @@ export async function POST(request: NextRequest) {
               },
             })
 
+            // Update Usage Stats for AI Generation
+            const currentMonth = new Date()
+            currentMonth.setDate(1)
+            currentMonth.setHours(0, 0, 0, 0)
+
+            await prisma.usageStats.upsert({
+              where: {
+                userId_month: {
+                  userId: (session.user as any).id,
+                  month: currentMonth,
+                },
+              },
+              update: {
+                aiResponseCount: { increment: 1 },
+                tokensUsed: { increment: responseResult.tokensUsed },
+              },
+              create: {
+                userId: (session.user as any).id,
+                month: currentMonth,
+                aiResponseCount: 1,
+                tokensUsed: responseResult.tokensUsed,
+              },
+            })
+
             // Update review status to indicate it's pending response
             await prisma.review.update({
               where: { id: currentReviewId },

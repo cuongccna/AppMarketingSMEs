@@ -70,6 +70,30 @@ export async function GET(request: NextRequest) {
               },
             })
 
+            // Update Usage Stats
+            const currentMonth = new Date()
+            currentMonth.setDate(1)
+            currentMonth.setHours(0, 0, 0, 0)
+
+            await prisma.usageStats.upsert({
+              where: {
+                userId_month: {
+                  userId: userId,
+                  month: currentMonth,
+                },
+              },
+              update: {
+                aiResponseCount: { increment: 1 },
+                tokensUsed: { increment: responseResult.tokensUsed },
+              },
+              create: {
+                userId: userId,
+                month: currentMonth,
+                aiResponseCount: 1,
+                tokensUsed: responseResult.tokensUsed,
+              },
+            })
+
             await prisma.review.update({
               where: { id: review.id },
               data: { status: 'PENDING_RESPONSE' }

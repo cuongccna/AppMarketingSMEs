@@ -92,6 +92,9 @@ export async function GET(request: NextRequest) {
     for (const account of accountsList) {
         if (!account.name) continue;
         try {
+            // Add a small delay to avoid hitting rate limits (Requests per minute)
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             const locationsResponse = await mybusinessBusiness.accounts.locations.list({
                 parent: account.name,
                 readMask: 'name,title,storeCode,metadata',
