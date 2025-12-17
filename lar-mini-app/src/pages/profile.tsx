@@ -328,7 +328,7 @@ const Personal: FC<{ userInfo: any; customerInfo: CustomerInfo; onRefresh: () =>
             onClick: () => setHistoryVisible(true)
           },
           {
-            left: <Icon icon="zi-star-solid" className="text-primary" />,
+            left: <Icon icon="zi-star" className="text-primary" />,
             right: (
               <Box flex>
                 <Text.Header className="flex-1 items-center font-normal">
