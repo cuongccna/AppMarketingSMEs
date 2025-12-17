@@ -31,23 +31,57 @@ export async function GET(request: NextRequest) {
     oauth2Client.setCredentials(tokens)
 
     // Get user info to verify
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
-    const userInfo = await oauth2.userinfo.get()
+    let userInfo;
+    try {
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
+      userInfo = await oauth2.userinfo.get()
+    } catch (e: any) {
+      console.error('Failed to get user info:', e)
+      throw new Error(`UserInfo Error: ${e.message}`)
+    }
 
     // Get GBP accounts/locations
-    const mybusinessAccount = google.mybusinessaccountmanagement({ version: 'v1', auth: oauth2Client })
-    const accounts = await mybusinessAccount.accounts.list()
+    let accounts;
+    try {
+      const mybusinessAccount = google.mybusinessaccountmanagement({ version: 'v1', auth: oauth2Client })
+      
+      // Implement simple retry for accounts.list
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          accounts = await mybusinessAccount.accounts.list()
+          break;
+        } catch (e: any) {
+          if (e.code === 429 || e.message?.includes('Quota exceeded')) {
+            retries--;
+            if (retries === 0) throw e;
+            await new Promise(resolve => setTimeout(resolve, 1000 * (4 - retries))); // 1s, 2s, 3s
+          } else {
+            throw e;
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error('Failed to list accounts:', e)
+      throw new Error(`Accounts List Error: ${e.message}`)
+    }
     
-    const account = accounts.data.accounts?.[0]
+    const account = accounts?.data?.accounts?.[0]
     if (!account || !account.name) {
          return NextResponse.redirect(new URL('/dashboard/businesses?error=no_gbp_account', request.url))
     }
 
-    const mybusinessBusiness = google.mybusinessbusinessinformation({ version: 'v1', auth: oauth2Client })
-    const locationsResponse = await mybusinessBusiness.accounts.locations.list({
-        parent: account.name,
-        readMask: 'name,title,storeCode,metadata',
-    })
+    let locationsResponse;
+    try {
+      const mybusinessBusiness = google.mybusinessbusinessinformation({ version: 'v1', auth: oauth2Client })
+      locationsResponse = await mybusinessBusiness.accounts.locations.list({
+          parent: account.name,
+          readMask: 'name,title,storeCode,metadata',
+      })
+    } catch (e: any) {
+      console.error('Failed to list locations:', e)
+      throw new Error(`Locations List Error: ${e.message}`)
+    }
     
     const locations = locationsResponse.data.locations
     

@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
     const scopes = [
       'https://www.googleapis.com/auth/business.manage',
       'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile'
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'openid'
     ]
 
     const authUrl = oauth2Client.generateAuthUrl({

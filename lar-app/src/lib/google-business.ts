@@ -62,22 +62,39 @@ export class GoogleBusinessProfileClient {
     this.accessToken = accessToken
   }
 
-  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    })
+  private async request<T>(endpoint: string, options?: RequestInit, retries = 3): Promise<T> {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+      })
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}))
-      throw new Error(error.error?.message || `GBP API Error: ${response.status}`)
+      if (response.status === 429 && retries > 0) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, 3 - retries) * 1000
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return this.request<T>(endpoint, options, retries - 1)
+      }
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error?.message || `GBP API Error: ${response.status}`)
+      }
+
+      return response.json()
+    } catch (error) {
+      if (retries > 0 && (error as any).message?.includes('Quota exceeded')) {
+         // Exponential backoff for quota errors too if caught as network error
+        const delay = Math.pow(2, 3 - retries) * 1000
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return this.request<T>(endpoint, options, retries - 1)
+      }
+      throw error
     }
-
-    return response.json()
   }
 
   /**

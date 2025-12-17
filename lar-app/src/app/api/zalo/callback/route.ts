@@ -13,28 +13,34 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
     const state = searchParams.get('state')
-    const oaId = searchParams.get('oa_id')
+    const oaIdParam = searchParams.get('oa_id') // Zalo returns oa_id in query params
+
+    console.log('🔍 Zalo Callback - Params:', { code: code?.substring(0, 10) + '...', state, oaIdParam })
 
     if (!code || !state) {
-      return NextResponse.redirect(new URL('/dashboard/settings?error=missing_params', request.url))
+      console.error('🔍 Zalo Callback - Missing code or state')
+      return NextResponse.redirect(new URL('/dashboard/businesses?error=missing_params', request.url))
     }
 
     // Decode state
     let stateData: { userId: string; locationId?: string; timestamp: number }
     try {
       stateData = JSON.parse(Buffer.from(state, 'base64').toString())
-    } catch {
+    } catch (e) {
+      console.error('🔍 Zalo Callback - Invalid state:', e)
       return NextResponse.redirect(new URL('/dashboard/businesses?error=invalid_state', request.url))
     }
 
     // Verify state is not too old (5 minutes)
     if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
+      console.error('🔍 Zalo Callback - Expired state')
       return NextResponse.redirect(new URL('/dashboard/businesses?error=expired_state', request.url))
     }
 
     const appId = process.env.ZALO_APP_ID!
     const appSecret = process.env.ZALO_APP_SECRET!
-    const redirectUri = process.env.ZALO_REDIRECT_URI || `${process.env.NEXTAUTH_URL}/api/zalo/callback`
+    
+    console.log('🔍 Zalo Token Exchange - Requesting...')
 
     // Exchange code for access token
     const tokenResponse = await fetch('https://oauth.zaloapp.com/v4/oa/access_token', {
@@ -50,7 +56,14 @@ export async function GET(request: NextRequest) {
       }),
     })
 
+    if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error(`🔍 Zalo Token Exchange - Error: ${errorText}`);
+        return NextResponse.redirect(new URL('/dashboard/businesses?error=token_exchange_failed', request.url))
+    }
+
     const tokenData = await tokenResponse.json()
+    console.log('🔍 Zalo Token Response:', JSON.stringify(tokenData, null, 2))
 
     if (tokenData.error) {
       console.error('Zalo token error:', tokenData)
@@ -66,9 +79,10 @@ export async function GET(request: NextRequest) {
       accessToken: access_token,
     })
 
-    let oaProfile: { name?: string; oa_id?: string } = {}
+    let oaProfile: { name?: string; oa_id?: string; avatar?: string } = {}
     try {
       oaProfile = await zaloClient.getProfile()
+      console.log('🔍 Zalo Callback - Fetched OA Info:', oaProfile)
     } catch (error) {
       console.error('Failed to get OA profile:', error)
     }
@@ -99,6 +113,11 @@ export async function GET(request: NextRequest) {
       locationId = location.id
     }
 
+    const finalOaId = oaIdParam || oaProfile.oa_id || ''
+    const finalOaName = oaProfile.name || 'Zalo OA'
+
+    console.log('🔍 Zalo Callback - Final OA:', { finalOaId, finalOaName, locationId })
+
     // Upsert platform connection
     await prisma.platformConnection.upsert({
       where: {
@@ -111,8 +130,8 @@ export async function GET(request: NextRequest) {
         accessToken: access_token,
         refreshToken: refresh_token,
         tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
-        externalId: oaId || oaProfile.oa_id || '',
-        platformName: oaProfile.name || 'Zalo OA',
+        externalId: finalOaId,
+        platformName: finalOaName,
         isConnected: true,
         lastSyncAt: new Date(),
       },
@@ -122,8 +141,8 @@ export async function GET(request: NextRequest) {
         accessToken: access_token,
         refreshToken: refresh_token,
         tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
-        externalId: oaId || oaProfile.oa_id || '',
-        platformName: oaProfile.name || 'Zalo OA',
+        externalId: finalOaId,
+        platformName: finalOaName,
         isConnected: true,
         lastSyncAt: new Date(),
       },
