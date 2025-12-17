@@ -25,6 +25,9 @@ interface Reward {
   image: string
   pointsRequired: number
   isActive: boolean
+  quantity: number
+  startTime?: string
+  endTime?: string
 }
 
 export default function LocationSettingsPage() {
@@ -299,7 +302,7 @@ export default function LocationSettingsPage() {
         <RewardModal 
           isOpen={isRewardModalOpen} 
           onClose={() => setIsRewardModalOpen(false)}
-          onSubmit={async (data: { name: string; description: string; pointsRequired: number; image: string; imageBase64?: string }) => {
+          onSubmit={async (data) => {
             try {
               const url = editingReward ? `/api/rewards/${editingReward.id}` : '/api/rewards'
               const method = editingReward ? 'PATCH' : 'POST'
@@ -330,7 +333,17 @@ export default function LocationSettingsPage() {
 interface RewardModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: { name: string; description: string; pointsRequired: number; image: string; imageBase64?: string }) => Promise<void>
+  onSubmit: (data: { 
+    name: string; 
+    description: string; 
+    pointsRequired: number; 
+    quantity: number;
+    startTime?: string;
+    endTime?: string;
+    isActive: boolean;
+    image: string; 
+    imageBase64?: string 
+  }) => Promise<void>
   initialData?: Reward | null
 }
 
@@ -338,6 +351,10 @@ function RewardModal({ isOpen, onClose, onSubmit, initialData }: RewardModalProp
   const [name, setName] = useState(initialData?.name || '')
   const [description, setDescription] = useState(initialData?.description || '')
   const [pointsRequired, setPointsRequired] = useState(initialData?.pointsRequired?.toString() || '100')
+  const [quantity, setQuantity] = useState(initialData?.quantity?.toString() || '0')
+  const [startTime, setStartTime] = useState(initialData?.startTime ? new Date(initialData.startTime).toISOString().slice(0, 16) : '')
+  const [endTime, setEndTime] = useState(initialData?.endTime ? new Date(initialData.endTime).toISOString().slice(0, 16) : '')
+  const [isActive, setIsActive] = useState(initialData?.isActive ?? true)
   const [image, setImage] = useState(initialData?.image || '')
   const [imageBase64, setImageBase64] = useState('')
   const [previewImage, setPreviewImage] = useState(initialData?.image || '')
@@ -359,7 +376,17 @@ function RewardModal({ isOpen, onClose, onSubmit, initialData }: RewardModalProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
-    await onSubmit({ name, description, pointsRequired: parseInt(pointsRequired), image, imageBase64 })
+    await onSubmit({ 
+      name, 
+      description, 
+      pointsRequired: parseInt(pointsRequired), 
+      quantity: parseInt(quantity),
+      startTime: startTime || undefined,
+      endTime: endTime || undefined,
+      isActive,
+      image, 
+      imageBase64 
+    })
     setSubmitting(false)
   }
 
@@ -378,9 +405,35 @@ function RewardModal({ isOpen, onClose, onSubmit, initialData }: RewardModalProp
             <label className="text-sm font-medium">Mô tả</label>
             <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Mô tả chi tiết..." />
           </div>
-          <div>
-            <label className="text-sm font-medium">Điểm đổi quà</label>
-            <Input type="number" value={pointsRequired} onChange={e => setPointsRequired(e.target.value)} required min={1} />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Điểm đổi quà</label>
+              <Input type="number" value={pointsRequired} onChange={e => setPointsRequired(e.target.value)} required min={1} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Số lượng</label>
+              <Input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min={0} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Bắt đầu</label>
+              <Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Kết thúc</label>
+              <Input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+             <input 
+               type="checkbox" 
+               id="isActive"
+               checked={isActive} 
+               onChange={e => setIsActive(e.target.checked)} 
+               className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" 
+             />
+             <label htmlFor="isActive" className="text-sm font-medium cursor-pointer">Kích hoạt hiệu lực</label>
           </div>
           <div>
             <label className="text-sm font-medium">Hình ảnh</label>

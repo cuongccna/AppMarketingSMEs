@@ -5,6 +5,41 @@ import { useRecoilValue } from "recoil";
 import { userState } from "../state";
 import { QRCodeSVG } from "qrcode.react";
 
+const CountdownTimer = ({ endTime }: { endTime: string }) => {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const end = new Date(endTime).getTime();
+      const distance = end - now;
+
+      if (distance < 0) {
+        return "Đã kết thúc";
+      }
+
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+
+      let text = "Hết hạn sau: ";
+      if (days > 0) text += `${days}d `;
+      text += `${hours}h ${minutes}m`;
+      return text;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
+    const interval = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [endTime]);
+
+  return <Text size="xxSmall" className="text-red-500 mb-1 block">{timeLeft}</Text>;
+};
+
 const RewardsPage = () => {
   const user = useRecoilValue(userState);
   const { openSnackbar } = useSnackbar();
@@ -81,7 +116,9 @@ const RewardsPage = () => {
                 <img src={reward.image || "https://via.placeholder.com/80"} alt={reward.name} className="w-20 h-20 object-cover rounded" />
                 <Box className="flex-1">
                   <Text.Title size="small">{reward.name}</Text.Title>
-                  <Text size="xxSmall" className="text-gray-500 mb-2">{reward.pointsRequired} điểm</Text>
+                  <Text size="xxSmall" className="text-gray-500 mb-1">{reward.pointsRequired} điểm</Text>
+                  <Text size="xxSmall" className="text-gray-500 mb-1">Còn lại: {reward.quantity}</Text>
+                  {reward.endTime && <CountdownTimer endTime={reward.endTime} />}
                   <Button 
                     size="small" 
                     disabled={customerPoints < reward.pointsRequired}

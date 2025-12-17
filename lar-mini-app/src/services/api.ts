@@ -109,6 +109,9 @@ export interface Reward {
   image: string;
   pointsRequired: number;
   location?: { name: string };
+  quantity: number;
+  startTime?: string;
+  endTime?: string;
 }
 
 export const getRewards = async (locationId?: string): Promise<Reward[]> => {

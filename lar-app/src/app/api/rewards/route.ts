@@ -11,6 +11,9 @@ const createRewardSchema = z.object({
   image: z.string().optional(),
   imageBase64: z.string().optional(),
   pointsRequired: z.number().int().min(1),
+  quantity: z.number().int().min(0).optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -109,6 +112,9 @@ export async function POST(request: NextRequest) {
         image: data.image || '/icons/icon-512x512.png',
         imageBinary: imageBinary,
         pointsRequired: data.pointsRequired,
+        quantity: data.quantity ?? 0,
+        startTime: data.startTime ? new Date(data.startTime) : null,
+        endTime: data.endTime ? new Date(data.endTime) : null,
         isActive: data.isActive ?? true,
       }
     })

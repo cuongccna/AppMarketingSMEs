@@ -47,11 +47,17 @@ export async function GET(request: NextRequest) {
       
       // Implement robust retry for accounts.list with exponential backoff
       let retries = 5;
-      let delay = 2000; // Start with 2 seconds
+      let delay = 3000; // Start with 3 seconds
+
+      console.log('Starting Google Accounts List with retry logic...');
 
       while (retries > 0) {
         try {
-          accounts = await mybusinessAccount.accounts.list()
+          // Disable default googleapis retry to control backoff manually
+          accounts = await mybusinessAccount.accounts.list({}, {
+            retryConfig: { retry: 0 }
+          })
+          console.log('Google Accounts List success');
           break;
         } catch (e: any) {
           const isQuotaError = e.code === 429 || 
@@ -63,7 +69,7 @@ export async function GET(request: NextRequest) {
             retries--;
             if (retries === 0) throw e;
             await new Promise(resolve => setTimeout(resolve, delay));
-            delay *= 2; // Exponential backoff: 2s, 4s, 8s, 16s, 32s
+            delay *= 2; // Exponential backoff: 3s, 6s, 12s, 24s, 48s
           } else {
             throw e;
           }

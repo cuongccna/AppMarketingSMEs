@@ -10,6 +10,9 @@ const updateRewardSchema = z.object({
   image: z.string().optional(),
   imageBase64: z.string().optional(),
   pointsRequired: z.number().int().min(1).optional(),
+  quantity: z.number().int().min(0).optional(),
+  startTime: z.string().optional().nullable(),
+  endTime: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 })
 
@@ -50,12 +53,14 @@ export async function PATCH(
     }
 
     // Remove imageBase64 from data object before passing to prisma
-    const { imageBase64, ...updateData } = data
+    const { imageBase64, startTime, endTime, ...updateData } = data
 
     const updatedReward = await prisma.reward.update({
       where: { id: params.id },
       data: {
         ...updateData,
+        startTime: startTime ? new Date(startTime) : (startTime === null ? null : undefined),
+        endTime: endTime ? new Date(endTime) : (endTime === null ? null : undefined),
         imageBinary: imageBinary,
       }
     })

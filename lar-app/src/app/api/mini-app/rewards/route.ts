@@ -11,8 +11,30 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const locationId = searchParams.get('locationId')
+    const now = new Date()
 
-    const whereClause = locationId ? { locationId, isActive: true } : { isActive: true }
+    const whereClause: any = {
+      isActive: true,
+      quantity: { gt: 0 },
+      AND: [
+        {
+          OR: [
+            { startTime: null },
+            { startTime: { lte: now } }
+          ]
+        },
+        {
+          OR: [
+            { endTime: null },
+            { endTime: { gte: now } }
+          ]
+        }
+      ]
+    }
+
+    if (locationId) {
+      whereClause.locationId = locationId
+    }
 
     const rewards = await prisma.reward.findMany({
       where: whereClause,
