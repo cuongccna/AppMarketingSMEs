@@ -45,17 +45,25 @@ export async function GET(request: NextRequest) {
     try {
       const mybusinessAccount = google.mybusinessaccountmanagement({ version: 'v1', auth: oauth2Client })
       
-      // Implement simple retry for accounts.list
-      let retries = 3;
+      // Implement robust retry for accounts.list with exponential backoff
+      let retries = 5;
+      let delay = 2000; // Start with 2 seconds
+
       while (retries > 0) {
         try {
           accounts = await mybusinessAccount.accounts.list()
           break;
         } catch (e: any) {
-          if (e.code === 429 || e.message?.includes('Quota exceeded')) {
+          const isQuotaError = e.code === 429 || 
+                               e.message?.includes('Quota exceeded') || 
+                               e.status === 429;
+          
+          if (isQuotaError) {
+            console.log(`Quota exceeded for accounts.list. Retrying in ${delay}ms... (${retries} retries left)`);
             retries--;
             if (retries === 0) throw e;
-            await new Promise(resolve => setTimeout(resolve, 1000 * (4 - retries))); // 1s, 2s, 3s
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // Exponential backoff: 2s, 4s, 8s, 16s, 32s
           } else {
             throw e;
           }
