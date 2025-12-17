@@ -80,24 +80,32 @@ export async function GET(request: NextRequest) {
       throw new Error(`Accounts List Error: ${e.message}`)
     }
     
-    const account = accounts?.data?.accounts?.[0]
-    if (!account || !account.name) {
+    const accountsList = accounts?.data?.accounts || []
+    if (accountsList.length === 0) {
          return NextResponse.redirect(new URL('/dashboard/businesses?error=no_gbp_account', request.url))
     }
 
-    let locationsResponse;
-    try {
-      const mybusinessBusiness = google.mybusinessbusinessinformation({ version: 'v1', auth: oauth2Client })
-      locationsResponse = await mybusinessBusiness.accounts.locations.list({
-          parent: account.name,
-          readMask: 'name,title,storeCode,metadata',
-      })
-    } catch (e: any) {
-      console.error('Failed to list locations:', e)
-      throw new Error(`Locations List Error: ${e.message}`)
+    let allLocations: any[] = [];
+    const mybusinessBusiness = google.mybusinessbusinessinformation({ version: 'v1', auth: oauth2Client })
+
+    // Iterate through all accounts to find locations
+    for (const account of accountsList) {
+        if (!account.name) continue;
+        try {
+            const locationsResponse = await mybusinessBusiness.accounts.locations.list({
+                parent: account.name,
+                readMask: 'name,title,storeCode,metadata',
+            })
+            if (locationsResponse.data.locations) {
+                allLocations = allLocations.concat(locationsResponse.data.locations);
+            }
+        } catch (e: any) {
+            console.error(`Failed to list locations for account ${account.name}:`, e.message)
+            // Continue to next account
+        }
     }
     
-    const locations = locationsResponse.data.locations
+    const locations = allLocations
     
     let externalId = ''
     let platformName = userInfo.data.email || 'Google Business Profile'

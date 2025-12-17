@@ -113,8 +113,13 @@ export async function GET(request: NextRequest) {
       locationId = location.id
     }
 
-    const finalOaId = oaIdParam || oaProfile.oa_id || ''
+    const finalOaId = oaIdParam || oaProfile.oa_id
     const finalOaName = oaProfile.name || 'Zalo OA'
+
+    if (!finalOaId) {
+      console.error('🔍 Zalo Callback - Failed to get OA ID from both param and profile');
+      return NextResponse.redirect(new URL('/dashboard/businesses?error=no_oa_id', request.url))
+    }
 
     console.log('🔍 Zalo Callback - Final OA:', { finalOaId, finalOaName, locationId })
 
