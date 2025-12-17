@@ -144,30 +144,39 @@ export async function GET(request: NextRequest) {
           try {
             const review = response.review
             const location = review.location
-            const gbpConnection = location.platformConnections[0]
-
-            if (!gbpConnection || !gbpConnection.accessToken) {
-              const connections = location.platformConnections.map((c: any) => `${c.platform} (Connected: ${c.isConnected})`).join(', ')
-              const msg = `No GBP connection for location ${location.id}. Found: ${connections || 'None'}`
-              console.error(msg)
-              errorDetails.push({ id: response.id, error: msg })
-              errorCount++
-              continue
-            }
-
-            // Parse external ID (format: accountId/locationId)
-            const [accountId, gbpLocationId] = gbpConnection.externalId.split('/')
             
-            // Initialize GBP client
-            const gbpClient = new GoogleBusinessProfileClient(gbpConnection.accessToken)
+            // ---------------------------------------------------------
+            // Handle Platform Specific Logic
+            // ---------------------------------------------------------
+            if (review.platform === 'GOOGLE_BUSINESS_PROFILE') {
+                const gbpConnection = location.platformConnections[0]
 
-            // Send reply
-            await gbpClient.replyToReview(
-              accountId,
-              gbpLocationId,
-              review.externalId,
-              response.content
-            )
+                if (!gbpConnection || !gbpConnection.accessToken) {
+                  const connections = location.platformConnections.map((c: any) => `${c.platform} (Connected: ${c.isConnected})`).join(', ')
+                  const msg = `No GBP connection for location ${location.id}. Found: ${connections || 'None'}`
+                  console.error(msg)
+                  errorDetails.push({ id: response.id, error: msg })
+                  errorCount++
+                  continue
+                }
+
+                // Parse external ID (format: accountId/locationId)
+                const [accountId, gbpLocationId] = gbpConnection.externalId.split('/')
+                
+                // Initialize GBP client
+                const gbpClient = new GoogleBusinessProfileClient(gbpConnection.accessToken)
+
+                // Send reply
+                await gbpClient.replyToReview(
+                  accountId,
+                  gbpLocationId,
+                  review.externalId,
+                  response.content
+                )
+            } 
+            // For ZALO_OA, we don't need to call an external API to "publish" the reply 
+            // because the review exists within our system (or Zalo doesn't support direct API reply in the same way).
+            // We just proceed to mark it as PUBLISHED.
 
             // Update status
             await prisma.$transaction([
@@ -210,14 +219,18 @@ export async function GET(request: NextRequest) {
 
                   // Send Zalo OA Message
                   const zaloClient = createZaloOAClient()
-                  await zaloClient.sendTextMessage(
-                    review.zaloUserId,
-                    `Cảm ơn bạn đã đánh giá! ${location.name} vừa phản hồi: "${response.content}"`
-                  )
-                  console.log(`Sent Zalo notification to ${review.zaloUserId}`)
+                  try {
+                    await zaloClient.sendTextMessage(
+                      review.zaloUserId,
+                      `Cảm ơn bạn đã đánh giá! ${location.name} vừa phản hồi: "${response.content}"`
+                    )
+                    console.log(`Sent Zalo notification to ${review.zaloUserId}`)
+                  } catch (zaloMsgError) {
+                    console.error(`Failed to send Zalo OA message to ${review.zaloUserId}:`, zaloMsgError)
+                  }
                 }
               } catch (zaloError) {
-                console.error(`Failed to send Zalo notification for review ${review.id}:`, zaloError)
+                console.error(`Failed to process Zalo notification for review ${review.id}:`, zaloError)
                 // Don't fail the whole process if notification fails
               }
             }
